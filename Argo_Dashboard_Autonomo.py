@@ -73,20 +73,34 @@ def lector_polymarket(query: str = "general") -> str:
 # 2. LÓGICA CORE DE LOS AGENTES
 # ==========================================
 def obtener_datos_polymarket():
-    """Obtiene datos reales de Polymarket ANTES de lanzar los agentes."""
+    """Obtiene datos reales de Polymarket ANTES de lanzar los agentes (generales + deportivos)."""
+    mercados = []
+    # Fuente 1: Mercados generales (política, crypto, geopolítica)
     try:
-        url = "https://gamma-api.polymarket.com/events?limit=25&active=true&closed=false"
-        response = requests.get(url, timeout=10)
-        data = response.json()
-        mercados = []
-        for e in data:
-            if e.get("volume", 0) > 50000:
-                mercados.append(f"- Mercado: {e.get('title', 'N/A')} | Volumen USD: {e.get('volume', 0)} | Categoría: {e.get('category', 'Otro')}")
-        if not mercados:
-            return "No se encontraron mercados de alto volumen hoy."
-        return "MERCADOS ACTIVOS EN POLYMARKET HOY:\n" + "\n".join(mercados[:5])
-    except Exception as e:
-        return f"Error leyendo Polymarket: {str(e)}"
+        url_general = "https://gamma-api.polymarket.com/events?limit=25&active=true&closed=false"
+        resp = requests.get(url_general, timeout=10)
+        for e in resp.json():
+            vol = e.get("volume", 0)
+            if vol > 50000:
+                mercados.append({"titulo": e.get("title", "N/A"), "volumen": vol, "categoria": "General"})
+    except Exception:
+        pass
+    # Fuente 2: Mercados deportivos (NBA, NFL, Fútbol, UFC, F1, etc.)
+    try:
+        url_sports = "https://gamma-api.polymarket.com/events?limit=25&active=true&closed=false&tag=sports"
+        resp2 = requests.get(url_sports, timeout=10)
+        for e in resp2.json():
+            vol = e.get("volume", 0)
+            if vol > 5000:  # Umbral más bajo para deportes
+                mercados.append({"titulo": e.get("title", "N/A"), "volumen": vol, "categoria": "Deportes"})
+    except Exception:
+        pass
+    if not mercados:
+        return "No se encontraron mercados activos hoy."
+    # Ordenamos por volumen y mostramos top 10
+    mercados.sort(key=lambda x: x["volumen"], reverse=True)
+    lineas = [f"- [{m['categoria']}] {m['titulo']} | Volumen: ${m['volumen']:,.0f}" for m in mercados[:10]]
+    return "MERCADOS ACTIVOS EN POLYMARKET HOY (Generales + Deportes):\n" + "\n".join(lineas)
 
 def misiones_argo(api_key, saldo_actual):
     os.environ["GROQ_API_KEY"] = api_key
