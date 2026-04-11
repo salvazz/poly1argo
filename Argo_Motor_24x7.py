@@ -151,11 +151,22 @@ def ejecutar_mision_compra():
     except: pass
 
 if __name__ == "__main__":
-    print("🛰️ ARGO MOTOR V4 (NOTICIAS + CIERRES) INICIADO...")
+    print("🛰️ ARGO MOTOR V4.1 (ALTA VELOCIDAD DE RESPUESTA) INICIADO...")
+    enviar_telegram("🛰️ *SISTEMA ONLINE (Modo Alta Velocidad)*\nMonitorizando cierres cada 60s.")
+    
+    ultimo_escaneo_compra = 0
     while True:
         try:
+            # 1. Monitoreo de precios constant (Cada 60s)
             monitorear_y_vender()
-            ejecutar_mision_compra()
+            
+            # 2. Escaneo de nuevas compras (Cada 10 minutos para no saturar)
+            ahora = time.time()
+            if ahora - ultimo_escaneo_compra > 600: # 600 segundos = 10 min
+                ejecutar_mision_compra()
+                ultimo_escaneo_compra = ahora
+                
         except Exception as e:
-            print(f"Error: {e}")
-        time.sleep(300) # 5 minutos
+            print(f"Error en el ciclo: {e}")
+        
+        time.sleep(60) # Esperamos 1 minuto para el próximo check de precios
