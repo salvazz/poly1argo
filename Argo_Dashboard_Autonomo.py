@@ -29,6 +29,17 @@ def guardar_historial(registros):
     df = pd.DataFrame(registros)
     df.to_csv(HISTORIAL_CSV, index=False)
 
+def enviar_telegram(mensaje):
+    """Envía notificación a Telegram usando credenciales seguras."""
+    token = os.environ.get("TELEGRAM_TOKEN")
+    chat_id = os.environ.get("CHAT_ID")
+    if token and chat_id and "tu_token" not in token:
+        url = f"https://api.telegram.org/bot{token}/sendMessage"
+        try:
+            requests.post(url, json={"chat_id": chat_id, "text": mensaje, "parse_mode": "Markdown"})
+        except Exception:
+            pass
+
 # ==========================================
 # 1. HERRAMIENTA PERSONALIZADA (LOS OJOS)
 # ==========================================
@@ -186,8 +197,10 @@ with col_left:
                     if accion == "COMPRAR":
                         st.session_state["saldo"] -= monto
                         st.success(f"✅ ¡Compra simulada! El crítico gastó ${monto:.2f}.")
+                        enviar_telegram(f"🚀 *ARGO REPORTA COMPRA*\n\n*Mercado:* {datos.get('mercado')}\n*Inversión:* ${monto:.2f}\n*Veredicto crítico:* {datos.get('razonamiento')}\n\n*Saldo Restante:* ${st.session_state['saldo']:.2f}")
                     else:
                         st.warning("⚠️ El crítico ha vetado la operación.")
+                        enviar_telegram(f"🛑 *ARGO REPORTA VETO*\n\n*Mercado Analizado:* {datos.get('mercado')}\n*Razón:* {datos.get('razonamiento')}")
 
                 except Exception as e:
                     st.error("⚠️ Fallo en la traducción del juicio del robot a JSON. Verifica el texto en bruto.")
