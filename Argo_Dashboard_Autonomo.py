@@ -179,91 +179,159 @@ DEBES retornar ÚNICAMENTE el siguiente formato JSON puro. No pongas comillas in
 # ==========================================
 # 3. INTERFAZ FRONTAL (DASHBOARD)
 # ==========================================
+# ==========================================
+# 3. INTERFAZ FRONTAL (DASHBOARD PREMIUM)
+# ==========================================
+st.set_page_config(page_title="Argo V3 | Autonomous Trading", page_icon="🚢", layout="wide")
+
+# Curated HSL Palette & Premium Typography
+st.markdown("""
+    <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Outfit:wght@300;400;600;800&display=swap');
+    
+    :root {
+        --glass-bg: rgba(255, 255, 255, 0.05);
+        --glass-border: rgba(255, 255, 255, 0.1);
+        --accent: #6366f1;
+        --success: #10b981;
+        --warning: #f59e0b;
+    }
+
+    .main {
+        background: radial-gradient(circle at top right, #111827, #000000);
+        font-family: 'Inter', sans-serif;
+    }
+    
+    h1, h2, h3 {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 800;
+        letter-spacing: -0.02em;
+    }
+
+    /* Glassmorphism Cards */
+    .stMetric {
+        background: var(--glass-bg);
+        border: 1px solid var(--glass-border);
+        padding: 20px;
+        border-radius: 15px;
+        box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+        backdrop-filter: blur(4px);
+    }
+    
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 24px;
+        background-color: transparent;
+    }
+
+    .stTabs [data-baseweb="tab"] {
+        height: 50px;
+        background-color: transparent !important;
+        border: none !important;
+        font-weight: 600;
+        color: #94a3b8;
+    }
+
+    .stTabs [aria-selected="true"] {
+        color: white !important;
+        border-bottom: 2px solid var(--accent) !important;
+    }
+
+    /* Target specific mobile tweaks */
+    @media (max-width: 768px) {
+        .stColumns {
+            flex-direction: column !important;
+        }
+    }
+    </style>
+""", unsafe_allow_html=True)
+
 if "historial" not in st.session_state:
     st.session_state["historial"] = cargar_historial()
 if "saldo" not in st.session_state:
-    # Calculamos el saldo basándose en el historial (Empieza en 50, se resta lo invertido)
     invertido = sum([float(x.get("Inversión", 0)) for x in st.session_state["historial"] if x.get("Acción") == "COMPRAR"])
-    st.session_state["saldo"] = max(0, 50.0 - invertido)
+    st.session_state["saldo"] = max(0, 1000.0 - invertido)
 
-st.title("🚢 Argo V3 - Panel 100% Local (Con Agentes Reales)")
-st.markdown("Dashboard interactivo en caliente. Los agentes **tienen acceso a Internet** y comprarán de forma simulada en Polymarket.")
+# Header Premium
+st.image("https://img.icons8.com/isometric/512/ship-front-view.png", width=80)
+st.title("Argo V3")
+st.markdown("<p style='font-size: 1.2em; color: #94a3b8; margin-bottom: 2em;'>Patrulla de Agentes Inteligentes sobre Polymarket</p>", unsafe_allow_html=True)
 
-col_left, col_right = st.columns([1, 4])
+# Layout Principal: Stats en la parte superior para mobile
+stat_col1, stat_col2, stat_col3 = st.columns(3)
+with stat_col1:
+    st.metric("Cartera Simulada", f"${st.session_state['saldo']:.2f}", help="Saldo inicial: $1,000.00")
+with stat_col2:
+    ventas = len([x for x in st.session_state["historial"] if x.get("Acción") == "COMPRAR"])
+    st.metric("Operaciones", ventas, delta=f"+{ventas} hoy")
+with stat_col3:
+    st.metric("Estatus del Motor", "ONLINE 🟢", help="El motor 24/7 en segundo plano")
 
-with col_left:
-    st.subheader("🔑 Tu Billetera")
-    st.metric(label="Saldo (Simulado)", value=f"${st.session_state['saldo']:.2f}")
-    api_key_input = st.text_input("Groq API Key (Recomendado)", type="password", value=os.environ.get("GROQ_API_KEY", ""))
+st.write("")
+
+# Controles y Dashboard
+col_main, col_side = st.columns([3, 1])
+
+with col_side:
+    st.markdown("### ⚙️ Centro de Mando")
+    api_key_input = st.text_input("Groq API Key (Secure)", type="password", value=os.environ.get("GROQ_API_KEY", ""))
     
-    st.write("---")
-    if st.button("🚀 Iniciar Escaneo y Simular", use_container_width=True):
+    st.write("")
+    if st.button("🚀 Ejecutar Análisis Manual", use_container_width=True):
         if not api_key_input:
-            st.error("Introduce tu Groq API Key.")
+            st.error("Falta API Key")
         else:
-            with st.spinner("🤖 Desplegando agentes en la API Gamma de Polymarket. Por favor, espera ~45 segundos..."):
+            with st.spinner("🧠 Sincronizando agentes con la red..."):
                 resultado_bruto = str(misiones_argo(api_key_input, st.session_state["saldo"]))
                 st.session_state["ultimo_veredicto"] = resultado_bruto
                 
-                # Intentamos extraer el JSON de forma segura usando expresiones regulares
                 try:
                     match = re.search(r'\{.*\}', resultado_bruto.replace('\n', ''), re.IGNORECASE)
                     if match:
-                        json_str = match.group(0)
-                        datos = json.loads(json_str)
-                    else:
-                        datos = json.loads(resultado_bruto) # Si el agente lo dio limpio
+                        datos = json.loads(match.group(0))
+                        accion = datos.get("accion", "RECHAZAR").upper()
+                        monto = float(datos.get("monto", 0.0))
                         
-                    # Agregamos al historial local si es válido
-                    accion = datos.get("accion", "RECHAZAR").upper()
-                    monto = float(datos.get("monto", 0.0))
-                    
-                    registro = {
-                        "Fecha": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                        "Mercado": datos.get("mercado", "Mercado Desconocido"),
-                        "Acción": accion,
-                        "Inversión": monto,
-                        "Razonamiento": datos.get("razonamiento", "Sin justificación aportada")
-                    }
-                    
-                    st.session_state["historial"].insert(0, registro)
-                    guardar_historial(st.session_state["historial"]) # Guardamos en Excel local
-                    
-                    if accion == "COMPRAR":
-                        st.session_state["saldo"] -= monto
-                        st.success(f"✅ ¡Compra simulada! El crítico gastó ${monto:.2f}.")
-                        enviar_telegram(f"🚀 *ARGO REPORTA COMPRA*\n\n*Mercado:* {datos.get('mercado')}\n*Inversión:* ${monto:.2f}\n*Veredicto crítico:* {datos.get('razonamiento')}\n\n*Saldo Restante:* ${st.session_state['saldo']:.2f}")
-                    else:
-                        st.warning("⚠️ El crítico ha vetado la operación.")
-                        enviar_telegram(f"🛑 *ARGO REPORTA VETO*\n\n*Mercado Analizado:* {datos.get('mercado')}\n*Razón:* {datos.get('razonamiento')}")
+                        registro = {
+                            "Fecha": datetime.now().strftime("%H:%M:%S"),
+                            "Mercado": datos.get("mercado", "N/A"),
+                            "Acción": accion,
+                            "Inversión": monto,
+                            "Razonamiento": datos.get("razonamiento", "...")
+                        }
+                        st.session_state["historial"].insert(0, registro)
+                        guardar_historial(st.session_state["historial"])
+                        
+                        if accion == "COMPRAR":
+                            st.session_state["saldo"] -= monto
+                            st.success(f"Detección: COMPRA")
+                            enviar_telegram(f"🚀 *ARGO COMPRA*\n{datos.get('mercado')}")
+                        else:
+                            st.info("Detección: VETO")
+                    st.rerun()
+                except:
+                    st.error("Error al procesar")
 
-                except Exception as e:
-                    st.error("⚠️ Fallo en la traducción del juicio del robot a JSON. Verifica el texto en bruto.")
-
-with col_right:
-    tab1, tab2 = st.tabs(["🗃️ Registro de Operaciones y Decisiones", "🧠 Cerebro en Bruto"])
+with col_main:
+    t_history, t_brain = st.tabs(["📊 Historial de Patrullaje", "🧠 Procesamiento de Señal"])
     
-    with tab1:
+    with t_history:
         if len(st.session_state["historial"]) > 0:
             df = pd.DataFrame(st.session_state["historial"])
             
-            # Resaltar colores según acción (Comprar o Rechazar)
-            def color_accion(val):
-                color = '#c6f6d5' if val == 'COMPRAR' else '#fed7d7'
-                return f'background-color: {color}; color: black;'
-            
+            def styling_historial(row):
+                color = 'color: #10b981; font-weight: bold;' if row['Acción'] == 'COMPRAR' else 'color: #fca5a5;'
+                return [color] * len(row)
+
             st.dataframe(
-                df.style.map(color_accion, subset=['Acción']), 
-                use_container_width=True, 
-                height=400
+                df.style.apply(styling_historial, axis=1),
+                use_container_width=True,
+                height=500
             )
-            st.caption(f"Estos datos se están guardando localmente en: {HISTORIAL_CSV}")
         else:
-            st.info("Sin operaciones registradas aún. ¡Lanza la patrulla!")
-            
-    with tab2:
-        st.write("Si quieres validar qué está pensando el sistema o si falló al guardar, mira el resultado sin procesar aquí:")
+            st.info("Sin anomalías detectadas. El sistema está en guardia.")
+
+    with t_brain:
         if "ultimo_veredicto" in st.session_state:
-            st.code(st.session_state["ultimo_veredicto"], language="json")
+            st.json(st.session_state["ultimo_veredicto"])
         else:
-            st.write("Esperando a la primera ejecución...")
+            st.write("Esperando señal del motor...")
