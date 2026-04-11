@@ -9,3 +9,5 @@ pytz
 pandas
 streamlit
 litellm
+plotly
+tavily-python

@@ -341,24 +341,40 @@ with col_side:
                 except:
                     st.error("Error al procesar")
 
+import plotly.express as px
+
+# ... (funciones previas se mantienen)
+
 with col_main:
+    st.markdown("### 📈 Rendimiento de la Flota")
+    if len(st.session_state["historial"]) > 0:
+        # Generar Curva de Capital (Simulada)
+        df_plot = pd.DataFrame(st.session_state["historial"])
+        df_plot['Inversión'] = pd.to_numeric(df_plot['Inversión'], errors='coerce')
+        # Simulamos una curva simple: Restamos inversion si compra, sumamos aprox si cerramos (o mantenemos)
+        df_plot['Balance'] = 50.0 - df_plot['Inversión'].cumsum()
+        
+        fig = px.line(df_plot, x='Fecha', y='Balance', title='Evolución del Saldo (Simulado)',
+                     line_shape='spline', markers=True)
+        fig.update_traces(line_color='#6366f1')
+        fig.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font_color='white')
+        st.plotly_chart(fig, use_container_width=True)
+
     t_history, t_brain = st.tabs(["📊 Historial de Patrullaje", "🧠 Procesamiento de Señal"])
     
     with t_history:
         if len(st.session_state["historial"]) > 0:
             df = pd.DataFrame(st.session_state["historial"])
             
-            def styling_historial(row):
-                color = 'color: #10b981; font-weight: bold;' if row['Acción'] == 'COMPRAR' else 'color: #fca5a5;'
-                return [color] * len(row)
-
-            st.dataframe(
-                df.style.apply(styling_historial, axis=1),
-                use_container_width=True,
-                height=500
-            )
+            # Filtro de estado si existe
+            if 'estado' in df.columns:
+                st.write("Filtrar por estado:")
+                st.dataframe(df, use_container_width=True)
+            else:
+                st.dataframe(df, use_container_width=True)
         else:
             st.info("Sin anomalías detectadas. El sistema está en guardia.")
+
 
     with t_brain:
         if "ultimo_veredicto" in st.session_state:
