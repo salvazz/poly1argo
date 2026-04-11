@@ -1,0 +1,7 @@
+crewai
+crewai-tools
+requests
+openpyxl
+python-dotenv
+websocket-client
+cryptography
