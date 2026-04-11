@@ -72,17 +72,34 @@ def lector_polymarket(query: str = "general") -> str:
 # ==========================================
 # 2. LÓGICA CORE DE LOS AGENTES
 # ==========================================
+def obtener_datos_polymarket():
+    """Obtiene datos reales de Polymarket ANTES de lanzar los agentes."""
+    try:
+        url = "https://gamma-api.polymarket.com/events?limit=25&active=true&closed=false"
+        response = requests.get(url, timeout=10)
+        data = response.json()
+        mercados = []
+        for e in data:
+            if e.get("volume", 0) > 50000:
+                mercados.append(f"- Mercado: {e.get('title', 'N/A')} | Volumen USD: {e.get('volume', 0)} | Categoría: {e.get('category', 'Otro')}")
+        if not mercados:
+            return "No se encontraron mercados de alto volumen hoy."
+        return "MERCADOS ACTIVOS EN POLYMARKET HOY:\n" + "\n".join(mercados[:5])
+    except Exception as e:
+        return f"Error leyendo Polymarket: {str(e)}"
+
 def misiones_argo(api_key, saldo_actual):
-    # En nuevas versiones de CrewAI / Langchain, el agente toma el LLM como string usando LiteLLM
     os.environ["GROQ_API_KEY"] = api_key
     modelo_ia = "groq/llama-3.3-70b-versatile"
     
-    # AGENTE 1: INVESTIGADOR (Con herramienta conectada)
+    # Pre-cargamos datos reales de Polymarket
+    datos_mercado = obtener_datos_polymarket()
+    
+    # AGENTE 1: INVESTIGADOR (Sin herramienta, recibe datos directamente)
     investigador = Agent(
         role="Investigador Jefe",
-        goal="Encontrar al menos 1 mercado activo con alto volumen usando tu herramienta LectorPolymarketGamma.",
-        backstory="Eres un sabueso de datos. Extraes la lista de Polymarket y seleccionas la oportunidad que tenga más liquidez.",
-        tools=[lector_polymarket], # AQUÍ ESTÁ LA LUZ PARA EL AGENTE
+        goal="Analizar los mercados activos de Polymarket y seleccionar la mejor oportunidad de inversión.",
+        backstory="Eres un sabueso de datos. Analizas la lista de mercados y seleccionas la oportunidad que tenga más liquidez y seguridad.",
         llm=modelo_ia,
         verbose=True
     )
@@ -105,10 +122,14 @@ def misiones_argo(api_key, saldo_actual):
         verbose=True
     )
 
-    # TAREAS
+    # TAREAS (Los datos reales se inyectan en la primera tarea)
     tarea1 = Task(
-        description="Usa la herramienta para listar los mercados de Polymarket de hoy. Escoge el que parezca más interesante y seguro.",
-        expected_output="Nombre del mercado top seleccionado.",
+        description=f"""Aquí tienes los datos REALES obtenidos de la API de Polymarket en tiempo real:
+
+{datos_mercado}
+
+Analiza estos mercados y escoge el que parezca más interesante, seguro y con mayor volumen de liquidez.""",
+        expected_output="Nombre del mercado top seleccionado y justificación breve.",
         agent=investigador
     )
     
