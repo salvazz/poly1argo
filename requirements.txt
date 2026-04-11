@@ -5,3 +5,7 @@ openpyxl
 python-dotenv
 websocket-client
 cryptography
+pytz
+pandas
+streamlit
+litellm

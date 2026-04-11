@@ -3,6 +3,8 @@ import time
 import json
 import pandas as pd
 import requests
+import pytz
+from datetime import datetime
 from dotenv import load_dotenv
 from crewai import Agent, Task, Crew
 
@@ -10,6 +12,12 @@ from crewai import Agent, Task, Crew
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 HISTORIAL_CSV = os.path.join(BASE_DIR, "data", "Argo_Historial.csv")
 load_dotenv(os.path.join(BASE_DIR, ".env"))
+
+# Zona horaria España
+SPAIN_TZ = pytz.timezone('Europe/Madrid')
+
+def obtener_hora_espana():
+    return datetime.now(SPAIN_TZ).strftime("%Y-%m-%d %H:%M:%S")
 
 def enviar_telegram(mensaje):
     token = os.environ.get("TELEGRAM_TOKEN")
@@ -75,7 +83,7 @@ def ejecutar_mision():
         data = json.loads(clean_output)
         
         # Guardar en CSV
-        data['fecha'] = time.strftime("%Y-%m-%d %H:%M:%S")
+        data['fecha'] = obtener_hora_espana()
         df_new = pd.DataFrame([data])
         if os.path.exists(HISTORIAL_CSV):
             df_old = pd.read_csv(HISTORIAL_CSV)

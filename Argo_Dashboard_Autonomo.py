@@ -6,10 +6,17 @@ import json
 import re
 from datetime import datetime
 from dotenv import load_dotenv
+import pytz
 
 # Importaciones de CrewAI y Langchain (Groq)
 from crewai import Agent, Task, Crew
 from crewai.tools import tool
+
+# Configuración de zona horaria España
+SPAIN_TZ = pytz.timezone('Europe/Madrid')
+
+def obtener_hora_espana():
+    return datetime.now(SPAIN_TZ).strftime("%Y-%m-%d %H:%M:%S")
 
 # ==========================================
 # CONFIGURACIONES Y PERSISTENCIA GLOBAL
@@ -292,7 +299,7 @@ with col_side:
                         monto = float(datos.get("monto", 0.0))
                         
                         registro = {
-                            "Fecha": datetime.now().strftime("%H:%M:%S"),
+                            "Fecha": obtener_hora_espana(),
                             "Mercado": datos.get("mercado", "N/A"),
                             "Acción": accion,
                             "Inversión": monto,
