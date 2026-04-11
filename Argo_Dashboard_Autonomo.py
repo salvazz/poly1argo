@@ -249,7 +249,7 @@ if "historial" not in st.session_state:
     st.session_state["historial"] = cargar_historial()
 if "saldo" not in st.session_state:
     invertido = sum([float(x.get("Inversión", 0)) for x in st.session_state["historial"] if x.get("Acción") == "COMPRAR"])
-    st.session_state["saldo"] = max(0, 1000.0 - invertido)
+    st.session_state["saldo"] = max(0, 50.0 - invertido)
 
 # Header Premium
 st.image("https://img.icons8.com/isometric/512/ship-front-view.png", width=80)
@@ -259,7 +259,7 @@ st.markdown("<p style='font-size: 1.2em; color: #94a3b8; margin-bottom: 2em;'>Pa
 # Layout Principal: Stats en la parte superior para mobile
 stat_col1, stat_col2, stat_col3 = st.columns(3)
 with stat_col1:
-    st.metric("Cartera Simulada", f"${st.session_state['saldo']:.2f}", help="Saldo inicial: $1,000.00")
+    st.metric("Cartera Simulada", f"${st.session_state['saldo']:.2f}", help="Saldo inicial: $50.00")
 with stat_col2:
     ventas = len([x for x in st.session_state["historial"] if x.get("Acción") == "COMPRAR"])
     st.metric("Operaciones", ventas, delta=f"+{ventas} hoy")
