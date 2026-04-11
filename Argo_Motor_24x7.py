@@ -6,7 +6,7 @@ import requests
 import pytz
 from datetime import datetime
 from dotenv import load_dotenv
-from crewai import Agent, Task, Crew
+from crewai import Agent, Task, Crew, Process
 from crewai_tools import TavilySearchResults
 
 # Configuración de rutas
@@ -18,7 +18,7 @@ load_dotenv(os.path.join(BASE_DIR, ".env"))
 SPAIN_TZ = pytz.timezone('Europe/Madrid')
 
 def obtener_hora_espana():
-    return datetime.now(SPAIN_TZ).strftime("%Y-%m-%d %H:%M:%S")
+    return datetime.now(SPAIN_TZ)
 
 def enviar_telegram(mensaje):
     token = os.environ.get("TELEGRAM_TOKEN")
@@ -41,8 +41,7 @@ def obtener_datos_polymarket():
                 mercados.append({
                     "titulo": e.get("title", "N/A"), 
                     "volumen": vol, 
-                    "precio": float(prices[0]) if prices else 0,
-                    "id": e.get("id")
+                    "precio": float(prices[0]) if prices else 0
                 })
     except: pass
     if not mercados: return []
@@ -50,11 +49,11 @@ def obtener_datos_polymarket():
     return mercados[:10]
 
 def monitorear_y_vender():
-    """Revisa posiciones abiertas y las cierra si tocan TP o SL."""
+    """Vigilancia con TRAILING STOP LOSS."""
     if not os.path.exists(HISTORIAL_CSV): return
-    
     df = pd.read_csv(HISTORIAL_CSV)
     if 'estado' not in df.columns: df['estado'] = 'ABIERTA'
+    if 'max_precio' not in df.columns: df['max_precio'] = df['Precio']
     
     abiertas = df[df['estado'] == 'ABIERTA']
     if abiertas.empty: return
@@ -68,22 +67,46 @@ def monitorear_y_vender():
             p_actual = precios_map[mercado]
             tp = row['TP']
             sl = row['SL']
+            max_p = row['max_precio']
             
-            cerrar = False
-            motivo = ""
-            
+            # Lógica Trailing SL: si el precio sube, subimos el SL (manteniendo distancia del 15% del maximo)
+            if p_actual > max_p:
+                df.at[idx, 'max_precio'] = p_actual
+                # El nuevo SL no puede bajar, solo subir
+                nuevo_sl = max(sl, p_actual * 0.85)
+                df.at[idx, 'SL'] = nuevo_sl
+                print(f"Subiendo Trailing SL para {mercado} a {nuevo_sl:.2f}")
+
+            # Verificacion de cierre
             if p_actual >= tp:
-                cerrar = True
-                motivo = f"✅ TAKE PROFIT alcanzado ({p_actual})"
-            elif p_actual <= sl:
-                cerrar = True
-                motivo = f"🛑 STOP LOSS ejecutado ({p_actual})"
-            
-            if cerrar:
                 df.at[idx, 'estado'] = 'CERRADA'
                 df.at[idx, 'precio_cierre'] = p_actual
-                df.to_csv(HISTORIAL_CSV, index=False)
-                enviar_telegram(f"📉 *OPERACIÓN CERRADA*\n*Mercado:* {mercado}\n*Resultado:* {motivo}")
+                enviar_telegram(f"💰 *TP ALCANZADO (+profit)*\n{mercado}\nCierre: {p_actual}")
+            elif p_actual <= df.at[idx, 'SL']:
+                df.at[idx, 'estado'] = 'CERRADA'
+                df.at[idx, 'precio_cierre'] = p_actual
+                enviar_telegram(f"🛡️ *TRAILING SL DISPARADO*\n{mercado}\nCierre: {p_actual}")
+            
+    df.to_csv(HISTORIAL_CSV, index=False)
+
+def enviar_informe_diario():
+    if not os.path.exists(HISTORIAL_CSV): return
+    df = pd.read_csv(HISTORIAL_CSV)
+    # Filtrar por hoy
+    hoy_str = obtener_hora_espana().strftime("%Y-%m-%d")
+    df_hoy = df[df['fecha'].str.contains(hoy_str)]
+    
+    total = len(df_hoy)
+    compras = len(df_hoy[df_hoy['Acción'] == 'COMPRAR'])
+    cerradas = len(df_hoy[df_hoy['estado'] == 'CERRADA'])
+    
+    msg = f"📊 *INFORME DIARIO ARGO*\n\n"
+    msg += f"📅 Fecha: {hoy_str}\n"
+    msg += f"🤖 Operaciones hoy: {total}\n"
+    msg += f"📥 Compras: {compras}\n"
+    msg += f"📤 Cierres ejecutados: {cerradas}\n\n"
+    msg += "¡Mañana más patrulla! 🚢"
+    enviar_telegram(msg)
 
 def ejecutar_mision_compra():
     api_key = os.environ.get("GROQ_API_KEY")
@@ -92,81 +115,69 @@ def ejecutar_mision_compra():
     
     mercados = obtener_datos_polymarket()
     if not mercados: return
+    texto_mercados = "\n".join([f"- {m['titulo']} | Precio: {m['precio']:.2f}" for m in mercados])
     
-    texto_mercados = "\n".join([f"- {m['titulo']} | Precio: {m['precio']:.2f} | Vol: ${m['volumen']:,.0f}" for m in mercados])
-    
-    # Herramienta de búsqueda
     search_tool = TavilySearchResults(k=3) if tavily_key else None
     modelo = "groq/llama-3.3-70b-versatile"
     
-    investigador = Agent(
-        role="Analista de Inteligencia",
-        goal="Investigar noticias reales y elegir el mercado mas probable.",
-        backstory="Eres experto en OSINT y predices eventos geopoliticos y deportivos.",
-        tools=[search_tool] if search_tool else [],
-        llm=modelo
-    )
+    # 1. El Investigador
+    inv = Agent(role="Analista", goal="Busca noticias positivas.", backstory="Optimista tecnológico.", tools=[search_tool] if search_tool else [], llm=modelo)
     
-    critico = Agent(
-        role="Gestor de Riesgos",
-        goal="Validar la compra y establecer TP/SL estrictos.",
-        backstory="No toleras perdidas. Quieres ganar un 20% minimo.",
-        llm=modelo
-    )
-
-    t1 = Task(
-        description=f"1. Analiza estos mercados:\n{texto_mercados}\n2. BUSCA NOTICIAS sobre los 2 mas interesantes.\n3. Elige el mejor.",
-        expected_output="Nombre del mercado y resumen de noticias que apoyan la decision.",
-        agent=investigador
-    )
+    # 2. El PESIMISTA (Abogado del diablo)
+    pes = Agent(role="Abogado del Diablo", goal="Encuentra razones para NO comprar.", backstory="Escéptico radical. Solo cree en los hechos negativos.", tools=[search_tool] if search_tool else [], llm=modelo)
     
-    t2 = Task(
-        description="Genera JSON: {'accion': 'COMPRAR', 'mercado': '...', 'precio_clob': 0.5, 'take_profit': 0.7, 'stop_loss': 0.4, 'monto': 2.5, 'razonamiento': '...', 'noticia': 'fuente noticia'}",
-        expected_output="JSON puro con estrategia completa.",
-        agent=critico
-    )
+    # 3. El Crítico (Veredicto)
+    cri = Agent(role="Gestor de Riesgos", goal="Decidir basandose en ambos.", backstory="Equilibrado y técnico.", llm=modelo)
 
-    crew = Crew(agents=[investigador, critico], tasks=[t1, t2], verbose=False)
+    t1 = Task(description=f"Analiza estos mercados y busca noticias positivas:\n{texto_mercados}", expected_output="Mercado candidato.", agent=inv)
+    t2 = Task(description="Analiza el candidato del Investigador y busca TODA LA BASURA y noticias negativas sobre ello. Destroza su argumento.", expected_output="Informe de riesgos.", agent=pes)
+    t3 = Task(description="JSON final: {'accion': 'COMPRAR', 'mercado': '...', 'precio_clob': 0.5, 'take_profit': 0.7, 'stop_loss': 0.4, 'monto': 2.5, 'razonamiento': '...'}", expected_output="JSON puro.", agent=cri)
+
+    crew = Crew(agents=[inv, pes, cri], tasks=[t1, t2, t3], process=Process.sequential, verbose=False)
     output = str(crew.kickoff())
     
     try:
         clean_output = output[output.find("{"):output.rfind("}")+1]
         data = json.loads(clean_output)
-        data['fecha'] = obtener_hora_espana()
+        data['fecha'] = obtener_hora_espana().strftime("%Y-%m-%d %H:%M:%S")
         data['estado'] = 'ABIERTA'
+        data['max_precio'] = data.get('precio_clob', 0.1)
         
-        # Evitar duplicados si ya esta abierta
         if os.path.exists(HISTORIAL_CSV):
             df_check = pd.read_csv(HISTORIAL_CSV)
-            if data['mercado'] in df_check[df_check['estado'] == 'ABIERTA']['Mercado'].values:
-                return # Ya tenemos esta operacion abierta
+            if data['mercado'] in df_check[df_check['estado'] == 'ABIERTA']['Mercado'].values: return
             df_final = pd.concat([df_check, pd.DataFrame([data])], ignore_index=True)
         else:
             df_final = pd.DataFrame([data])
             
         df_final.to_csv(HISTORIAL_CSV, index=False)
-        
         if data['accion'] == "COMPRAR":
-            enviar_telegram(f"🚀 *NUEVA COMPRA INTELIGENTE*\n*Mercado:* {data['mercado']}\n*TP:* {data['take_profit']} | *SL:* {data['stop_loss']}\n*Fuente:* {data.get('noticia', 'Analisis IA')}")
+            enviar_telegram(f"⚖️ *COMITÉ HA DECIDIDO: COMPRA*\n*Mercado:* {data['mercado']}\n*Veredicto:* {data['razonamiento'][:100]}...")
     except: pass
 
 if __name__ == "__main__":
-    print("🛰️ ARGO MOTOR V4.1 (ALTA VELOCIDAD DE RESPUESTA) INICIADO...")
-    enviar_telegram("🛰️ *SISTEMA ONLINE (Modo Alta Velocidad)*\nMonitorizando cierres cada 60s.")
-    
+    print("🛰️ ARGO MOTOR V5 (COMITÉ + TRAILING SL) INICIADO...")
+    informe_enviado_hoy = False
     ultimo_escaneo_compra = 0
+    
     while True:
         try:
-            # 1. Monitoreo de precios constant (Cada 60s)
+            ahora = obtener_hora_espana()
+            
+            # 1. Informe Diario a las 21:00
+            if ahora.hour == 21 and ahora.minute == 0 and not informe_enviado_hoy:
+                enviar_informe_diario()
+                informe_enviado_hoy = True
+            if ahora.hour == 22: # Reset para el dia siguiente
+                informe_enviado_hoy = False
+
+            # 2. Monitoreo rapido (Trailing SL)
             monitorear_y_vender()
             
-            # 2. Escaneo de nuevas compras (Cada 10 minutos para no saturar)
-            ahora = time.time()
-            if ahora - ultimo_escaneo_compra > 600: # 600 segundos = 10 min
+            # 3. Escaneo de compras cada 10 min
+            if time.time() - ultimo_escaneo_compra > 600:
                 ejecutar_mision_compra()
-                ultimo_escaneo_compra = ahora
+                ultimo_escaneo_compra = time.time()
                 
-        except Exception as e:
-            print(f"Error en el ciclo: {e}")
-        
-        time.sleep(60) # Esperamos 1 minuto para el próximo check de precios
+        except Exception as e: print(f"Error: {e}")
+        time.sleep(60)
