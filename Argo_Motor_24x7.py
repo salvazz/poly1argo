@@ -31,76 +31,62 @@ def enviar_telegram(mensaje):
 def obtener_datos_polymarket():
     mercados = []
     try:
-        # General
         r1 = requests.get("https://gamma-api.polymarket.com/events?limit=25&active=true&closed=false", timeout=10)
         for e in r1.json():
             vol = e.get("volume", 0)
             if vol > 50000:
-                mercados.append({"titulo": e.get("title", "N/A"), "volumen": vol, "categoria": "General"})
-        # Deportes
+                prices = e.get("outcomePrices", ["0", "0"])
+                if isinstance(prices, str): prices = json.loads(prices)
+                mercados.append({"titulo": e.get("title", "N/A"), "volumen": vol, "precio": float(prices[0]), "categoria": "General"})
         r2 = requests.get("https://gamma-api.polymarket.com/events?limit=25&active=true&closed=false&tag=sports", timeout=10)
         for e in r2.json():
             vol = e.get("volume", 0)
             if vol > 2000:
-                mercados.append({"titulo": e.get("title", "N/A"), "volumen": vol, "categoria": "Deportes"})
+                prices = e.get("outcomePrices", ["0", "0"])
+                if isinstance(prices, str): prices = json.loads(prices)
+                mercados.append({"titulo": e.get("title", "N/A"), "volumen": vol, "precio": float(prices[0]), "categoria": "Deportes"})
     except: pass
-    
-    if not mercados: return "No hay mercados claros ahora."
+    if not mercados: return "No hay mercados."
     mercados.sort(key=lambda x: x["volumen"], reverse=True)
-    res = [f"- [{m['categoria']}] {m['titulo']} | Vol: ${m['volumen']:,.0f}" for m in mercados[:10]]
+    res = [f"- [{m['categoria']}] {m['titulo']} | Precio: {m['precio']:.2f} | Vol: ${m['volumen']:,.0f}" for m in mercados[:10]]
     return "\n".join(res)
 
 def ejecutar_mision():
     api_key = os.environ.get("GROQ_API_KEY")
     if not api_key: return
-    
     datos_mercado = obtener_datos_polymarket()
     modelo = "groq/llama-3.3-70b-versatile"
     
-    investigador = Agent(
-        role="Investigador Jefe",
-        goal="Seleccionar el mercado mas seguro de la lista.",
-        backstory="Eres experto en detectar tendencias seguras.",
-        llm=modelo
-    )
-    
-    critico = Agent(
-        role="Crítico Judicial",
-        goal="Decide COMPRAR o RECHAZAR en JSON puro.",
-        backstory="Odias perder dinero simulado.",
-        llm=modelo
-    )
+    investigador = Agent(role="Investigador", goal="Elegir el mejor mercado.", backstory="Analista senior.", llm=modelo)
+    critico = Agent(role="Crítico", goal="Decidir en JSON con TP/SL.", backstory="Gestor de fondos.", llm=modelo)
 
-    t1 = Task(description=f"Analiza estos mercados:\n{datos_mercado}\nEscoge uno.", expected_output="Nombre mercado.", agent=investigador)
-    t2 = Task(description="Genera el JSON final: {'accion': 'COMPRAR'/'RECHAZAR', 'mercado': '...', 'monto': 2.50, 'razonamiento': '...'}", expected_output="JSON puro", agent=critico)
+    t1 = Task(description=f"Analiza:\n{datos_mercado}", expected_output="Mercado top.", agent=investigador)
+    t2 = Task(description="Genera JSON: {'accion': 'COMPRAR', 'mercado': '...', 'precio_clob': 0.5, 'take_profit': 0.6, 'stop_loss': 0.4, 'monto': 2.5, 'razonamiento': '...'}", expected_output="JSON puro", agent=critico)
 
     crew = Crew(agents=[investigador, critico], tasks=[t1, t2], verbose=False)
     output = str(crew.kickoff())
     
     try:
-        # Limpieza básica para extraer JSON si el LLM pone texto alrededor
         clean_output = output[output.find("{"):output.rfind("}")+1]
         data = json.loads(clean_output)
-        
-        # Guardar en CSV
         data['fecha'] = obtener_hora_espana()
+        
+        # Guardar (Append al CSV)
         df_new = pd.DataFrame([data])
         if os.path.exists(HISTORIAL_CSV):
             df_old = pd.read_csv(HISTORIAL_CSV)
             df_final = pd.concat([df_old, df_new], ignore_index=True)
         else:
             df_final = df_new
-        
-        os.makedirs(os.path.dirname(HISTORIAL_CSV), exist_ok=True)
         df_final.to_csv(HISTORIAL_CSV, index=False)
         
-        # Telegram
-        prefijo = "🚀 *COMPRA*" if data['accion'] == "COMPRAR" else "🛑 *VETO*"
-        enviar_telegram(f"{prefijo}\n*Mercado:* {data['mercado']}\n*Razón:* {data['razonamiento']}")
-        print(f"Misión completada: {data['accion']}")
-        
-    except Exception as e:
-        print(f"Error procesando salida: {e}")
+        # Telegram rico en info
+        if data['accion'] == "COMPRAR":
+            msg = f"🚀 *ARGO COMPRA*\n*Mercado:* {data['mercado']}\n*Precio:* {data.get('precio_clob')}\n*TP:* {data.get('take_profit')} | *SL:* {data.get('stop_loss')}"
+        else:
+            msg = f"🛑 *ARGO VETO*\n*Mercado:* {data['mercado']}\n*Razón:* {data['razonamiento']}"
+        enviar_telegram(msg)
+    except Exception as e: print(f"Error: {e}")
 
 if __name__ == "__main__":
     print("🛰️ ARGO MOTOR 24/7 INICIADO...")

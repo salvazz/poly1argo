@@ -80,34 +80,49 @@ def lector_polymarket(query: str = "general") -> str:
 # 2. LÓGICA CORE DE LOS AGENTES
 # ==========================================
 def obtener_datos_polymarket():
-    """Obtiene datos reales de Polymarket ANTES de lanzar los agentes (generales + deportivos)."""
+    """Obtiene datos reales de Polymarket incluyendo precios de salida."""
     mercados = []
-    # Fuente 1: Mercados generales (política, crypto, geopolítica)
     try:
         url_general = "https://gamma-api.polymarket.com/events?limit=25&active=true&closed=false"
         resp = requests.get(url_general, timeout=10)
         for e in resp.json():
             vol = e.get("volume", 0)
             if vol > 50000:
-                mercados.append({"titulo": e.get("title", "N/A"), "volumen": vol, "categoria": "General"})
-    except Exception:
-        pass
-    # Fuente 2: Mercados deportivos (NBA, NFL, Fútbol, UFC, F1, etc.)
+                # Extraer precio del "Sí" (índice 0 usualmente)
+                prices = e.get("outcomePrices", ["0", "0"])
+                if isinstance(prices, str): prices = json.loads(prices)
+                precio_si = float(prices[0]) if prices else 0
+                mercados.append({
+                    "titulo": e.get("title", "N/A"), 
+                    "volumen": vol, 
+                    "precio": precio_si,
+                    "categoria": "General"
+                })
+    except Exception: pass
+    
     try:
         url_sports = "https://gamma-api.polymarket.com/events?limit=25&active=true&closed=false&tag=sports"
         resp2 = requests.get(url_sports, timeout=10)
         for e in resp2.json():
             vol = e.get("volume", 0)
-            if vol > 5000:  # Umbral más bajo para deportes
-                mercados.append({"titulo": e.get("title", "N/A"), "volumen": vol, "categoria": "Deportes"})
-    except Exception:
-        pass
+            if vol > 5000:
+                prices = e.get("outcomePrices", ["0", "0"])
+                if isinstance(prices, str): prices = json.loads(prices)
+                precio_si = float(prices[0]) if prices else 0
+                mercados.append({
+                    "titulo": e.get("title", "N/A"), 
+                    "volumen": vol, 
+                    "precio": precio_si,
+                    "categoria": "Deportes"
+                })
+    except Exception: pass
+
     if not mercados:
         return "No se encontraron mercados activos hoy."
-    # Ordenamos por volumen y mostramos top 10
+    
     mercados.sort(key=lambda x: x["volumen"], reverse=True)
-    lineas = [f"- [{m['categoria']}] {m['titulo']} | Volumen: ${m['volumen']:,.0f}" for m in mercados[:10]]
-    return "MERCADOS ACTIVOS EN POLYMARKET HOY (Generales + Deportes):\n" + "\n".join(lineas)
+    lineas = [f"- [{m['categoria']}] {m['titulo']} | Precio Actual: {m['precio']:.2f} | Vol: ${m['volumen']:,.0f}" for m in mercados[:10]]
+    return "MERCADOS ACTIVOS:\n" + "\n".join(lineas)
 
 def misiones_argo(api_key, saldo_actual):
     os.environ["GROQ_API_KEY"] = api_key
@@ -162,15 +177,20 @@ Analiza estos mercados y escoge el que parezca más interesante, seguro y con ma
 
     tarea_final = Task(
         description='''Toma todo lo anterior y emite la decisión final.
-DEBES retornar ÚNICAMENTE el siguiente formato JSON puro. No pongas comillas invertidas ni bloques ```json. Solo el texto en diccionario:
+DEBES retornar ÚNICAMENTE el siguiente formato JSON puro. Precio entrada debe coincidir con el actual. 
+Calcula Take Profit (+20% del precio) y Stop Loss (-15% del precio) de forma técnica.
+JSON:
 {
-  "accion": "COMPRAR" (o cambia a "RECHAZAR"),
-  "mercado": "Título exacto del mercado propuesto",
+  "accion": "COMPRAR" (o "RECHAZAR"),
+  "mercado": "Título exacto",
+  "precio_clob": 0.75,
+  "take_profit": 0.90,
+  "stop_loss": 0.60,
   "monto": 2.50,
-  "razonamiento": "Tu justificación técnica"
+  "razonamiento": "Justificación"
 }
 ''',
-        expected_output="Objeto JSON puro con tu decisión final.",
+        expected_output="Objeto JSON puro con estrategia de salida.",
         agent=critico
     )
 
@@ -302,6 +322,9 @@ with col_side:
                             "Fecha": obtener_hora_espana(),
                             "Mercado": datos.get("mercado", "N/A"),
                             "Acción": accion,
+                            "Precio": datos.get("precio_clob", 0.0),
+                            "TP": datos.get("take_profit", 0.0),
+                            "SL": datos.get("stop_loss", 0.0),
                             "Inversión": monto,
                             "Razonamiento": datos.get("razonamiento", "...")
                         }
@@ -311,7 +334,7 @@ with col_side:
                         if accion == "COMPRAR":
                             st.session_state["saldo"] -= monto
                             st.success(f"Detección: COMPRA")
-                            enviar_telegram(f"🚀 *ARGO COMPRA*\n{datos.get('mercado')}")
+                            enviar_telegram(f"🚀 *ARGO COMPRA*\n*Mercado:* {datos.get('mercado')}\n*Precio:* {datos.get('precio_clob')}\n*TP:* {datos.get('take_profit')} | *SL:* {datos.get('stop_loss')}")
                         else:
                             st.info("Detección: VETO")
                     st.rerun()
