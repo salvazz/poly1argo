@@ -303,10 +303,90 @@ if "saldo" not in st.session_state:
     invertido = sum([float(x.get("Inversión", 0)) for x in st.session_state["historial"] if x.get("Acción") == "COMPRAR"])
     st.session_state["saldo"] = max(0, 50.0 - invertido)
 
-# Header Premium
-st.image("https://img.icons8.com/isometric/512/ship-front-view.png", width=80)
-st.title("Argo V3")
-st.markdown("<p style='font-size: 1.2em; color: #94a3b8; margin-bottom: 2em;'>Patrulla de Agentes Inteligentes sobre Polymarket</p>", unsafe_allow_html=True)
+# Header Premium con Canvas Animation
+st.markdown("""
+<div style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: -1; background: #020617;">
+    <canvas id="canvas-bg"></canvas>
+</div>
+<script>
+    const canvas = document.getElementById('canvas-bg');
+    const ctx = canvas.getContext('2d');
+    let particles = [];
+
+    function init() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        particles = [];
+        for (let i = 0; i < 80; i++) {
+            particles.push({
+                x: Math.random() * canvas.width,
+                y: Math.random() * canvas.height,
+                size: Math.random() * 2 + 1,
+                speedX: Math.random() * 0.5 - 0.25,
+                speedY: Math.random() * 0.5 - 0.25,
+                opacity: Math.random() * 0.5 + 0.2
+            });
+        }
+    }
+
+    function animate() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        ctx.strokeStyle = 'rgba(139, 92, 246, 0.1)';
+        ctx.lineWidth = 0.5;
+
+        for (let i = 0; i < particles.length; i++) {
+            let p = particles[i];
+            p.x += p.speedX;
+            p.y += p.speedY;
+
+            if (p.x < 0 || p.x > canvas.width) p.speedX *= -1;
+            if (p.y < 0 || p.y > canvas.height) p.speedY *= -1;
+
+            ctx.fillStyle = `rgba(139, 92, 246, ${p.opacity})`;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+            ctx.fill();
+
+            for (let j = i + 1; j < particles.length; j++) {
+                let p2 = particles[j];
+                let dist = Math.sqrt((p.x - p2.x)**2 + (p.y - p2.y)**2);
+                if (dist < 150) {
+                    ctx.beginPath();
+                    ctx.moveTo(p.x, p.y);
+                    ctx.lineTo(p2.x, p2.y);
+                    ctx.stroke();
+                }
+            }
+        }
+        requestAnimationFrame(animate);
+    }
+
+    window.addEventListener('resize', init);
+    init();
+    animate();
+</script>
+<style>
+    /* Transparencia para que se vea el canvas */
+    .stApp {
+        background: transparent !important;
+    }
+    div[data-testid="stToolbar"] { visibility: hidden; }
+    
+    .main-title {
+        font-family: 'Outfit', sans-serif;
+        font-size: 4rem;
+        background: linear-gradient(to right, #fff, #8b5cf6);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        text-align: center;
+        margin-bottom: 0.5rem;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+st.markdown('<h1 class="main-title">ARGO V3 PLATINUM</h1>', unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; font-size: 1.2em; color: #94a3b8; margin-bottom: 3em;'>Red Neuronal de Trading Autónomo en Polymarket</p>", unsafe_allow_html=True)
 
 # Layout Principal: Stats en la parte superior para mobile
 stat_col1, stat_col2, stat_col3 = st.columns(3)
