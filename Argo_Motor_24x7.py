@@ -34,20 +34,33 @@ def enviar_telegram(mensaje):
 def obtener_datos_polymarket():
     mercados = []
     try:
-        r1 = requests.get("https://gamma-api.polymarket.com/events?limit=25&active=true&closed=false", timeout=10)
+        # Aumentamos el límite para buscar más candidatos y filtrar por volatilidad
+        r1 = requests.get("https://gamma-api.polymarket.com/events?limit=100&active=true&closed=false", timeout=10)
         for e in r1.json():
             vol = e.get("volume", 0)
-            if vol > 50000:
+            # Filtro básico de liquidez para evitar mercados "muertos"
+            if vol > 10000:
                 prices = e.get("outcomePrices", ["0", "0"])
                 if isinstance(prices, str): prices = json.loads(prices)
+                
+                # Volatilidad basada en el cambio de precio de 24h
+                # Si no existe el campo, asumimos 0
+                change = abs(e.get("oneDayPriceChange", 0))
+                
                 mercados.append({
                     "titulo": e.get("title", "N/A"), 
                     "volumen": vol, 
-                    "precio": float(prices[0]) if prices else 0
+                    "precio": float(prices[0]) if prices else 0,
+                    "volatilidad": change
                 })
-    except: pass
+    except Exception as e: 
+        print(f"Error en API: {e}")
+        pass
+    
     if not mercados: return []
-    mercados.sort(key=lambda x: x["volumen"], reverse=True)
+    
+    # Ordenamos por VOLATILIDAD (cambio absoluto de precio en 24h)
+    mercados.sort(key=lambda x: x["volatilidad"], reverse=True)
     return mercados[:10]
 
 def monitorear_y_vender():
@@ -117,7 +130,7 @@ def ejecutar_mision_compra():
     
     mercados = obtener_datos_polymarket()
     if not mercados: return
-    texto_mercados = "\n".join([f"- {m['titulo']} | Precio: {m['precio']:.2f}" for m in mercados])
+    texto_mercados = "\n".join([f"- {m['titulo']} | Precio: {m['precio']:.2f} | Volatilidad (24h): {m['volatilidad']*100:+.2f}%" for m in mercados])
     
     search_tool = TavilySearchTool(k=3) if tavily_key else None
     modelo = "groq/llama-3.3-70b-versatile"

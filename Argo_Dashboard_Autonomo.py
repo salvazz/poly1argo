@@ -93,49 +93,37 @@ def lector_polymarket(query: str = "general") -> str:
 # 2. LÓGICA CORE DE LOS AGENTES
 # ==========================================
 def obtener_datos_polymarket():
-    """Obtiene datos reales de Polymarket incluyendo precios de salida."""
+    """Obtiene datos reales enfocados en los 10 mercados más volátiles."""
     mercados = []
     try:
-        url_general = "https://gamma-api.polymarket.com/events?limit=25&active=true&closed=false"
+        url_general = "https://gamma-api.polymarket.com/events?limit=100&active=true&closed=false"
         resp = requests.get(url_general, timeout=10)
         for e in resp.json():
             vol = e.get("volume", 0)
-            if vol > 50000:
-                # Extraer precio del "Sí" (índice 0 usualmente)
+            if vol > 10000:
                 prices = e.get("outcomePrices", ["0", "0"])
                 if isinstance(prices, str): prices = json.loads(prices)
                 precio_si = float(prices[0]) if prices else 0
+                
+                change = abs(e.get("oneDayPriceChange", 0))
+                
                 mercados.append({
                     "titulo": e.get("title", "N/A"), 
                     "volumen": vol, 
                     "precio": precio_si,
+                    "volatilidad": change,
                     "categoria": "General"
                 })
     except Exception: pass
     
-    try:
-        url_sports = "https://gamma-api.polymarket.com/events?limit=25&active=true&closed=false&tag=sports"
-        resp2 = requests.get(url_sports, timeout=10)
-        for e in resp2.json():
-            vol = e.get("volume", 0)
-            if vol > 5000:
-                prices = e.get("outcomePrices", ["0", "0"])
-                if isinstance(prices, str): prices = json.loads(prices)
-                precio_si = float(prices[0]) if prices else 0
-                mercados.append({
-                    "titulo": e.get("title", "N/A"), 
-                    "volumen": vol, 
-                    "precio": precio_si,
-                    "categoria": "Deportes"
-                })
-    except Exception: pass
-
     if not mercados:
         return "No se encontraron mercados activos hoy."
     
-    mercados.sort(key=lambda x: x["volumen"], reverse=True)
-    lineas = [f"- [{m['categoria']}] {m['titulo']} | Precio Actual: {m['precio']:.2f} | Vol: ${m['volumen']:,.0f}" for m in mercados[:10]]
-    return "MERCADOS ACTIVOS:\n" + "\n".join(lineas)
+    # Ordenamos por VOLATILIDAD
+    mercados.sort(key=lambda x: x["volatilidad"], reverse=True)
+    
+    lineas = [f"- [{m['categoria']}] {m['titulo']} | Precio: {m['precio']:.2f} | Volatilidad: {m['volatilidad']*100:+.2f}% | Vol: ${m['volumen']:,.0f}" for m in mercados[:10]]
+    return "TOP 10 MERCADOS POR VOLATILIDAD (24H):\n" + "\n".join(lineas)
 
 def misiones_argo(api_key, saldo_actual):
     os.environ["GROQ_API_KEY"] = api_key
