@@ -7,11 +7,13 @@ import pytz
 from datetime import datetime
 from dotenv import load_dotenv
 from crewai import Agent, Task, Crew, Process
-from crewai_tools import TavilySearchResults
+from crewai_tools import TavilySearchTool
+import bayesian_engine
 
 # Configuración de rutas
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 HISTORIAL_CSV = os.path.join(BASE_DIR, "data", "Argo_Historial.csv")
+HEARTBEAT_FILE = os.path.join(BASE_DIR, "data", "motor_heartbeat.txt")
 load_dotenv(os.path.join(BASE_DIR, ".env"))
 
 # Zona horaria España
@@ -117,7 +119,7 @@ def ejecutar_mision_compra():
     if not mercados: return
     texto_mercados = "\n".join([f"- {m['titulo']} | Precio: {m['precio']:.2f}" for m in mercados])
     
-    search_tool = TavilySearchResults(k=3) if tavily_key else None
+    search_tool = TavilySearchTool(k=3) if tavily_key else None
     modelo = "groq/llama-3.3-70b-versatile"
     
     # 1. El Investigador
@@ -129,9 +131,20 @@ def ejecutar_mision_compra():
     # 3. El Crítico (Veredicto)
     cri = Agent(role="Gestor de Riesgos", goal="Decidir basandose en ambos.", backstory="Equilibrado y técnico.", llm=modelo)
 
-    t1 = Task(description=f"Analiza estos mercados y busca noticias positivas:\n{texto_mercados}", expected_output="Mercado candidato.", agent=inv)
-    t2 = Task(description="Analiza el candidato del Investigador y busca TODA LA BASURA y noticias negativas sobre ello. Destroza su argumento.", expected_output="Informe de riesgos.", agent=pes)
-    t3 = Task(description="JSON final: {'accion': 'COMPRAR', 'mercado': '...', 'precio_clob': 0.5, 'take_profit': 0.7, 'stop_loss': 0.4, 'monto': 2.5, 'razonamiento': '...'}", expected_output="JSON puro.", agent=cri)
+    t1 = Task(description=f"Analiza estos mercados y busca noticias positivas:\n{texto_mercados}", expected_output="Mercado candidato y por qué.", agent=inv)
+    t2 = Task(description="Analiza el candidato y busca TODA LA BASURA y noticias negativas. Destroza su argumento.", expected_output="Informe de riesgos.", agent=pes)
+    t3 = Task(description="""JSON FINAL con este formato exacto:
+    {
+      "accion": "COMPRAR" o "VETO",
+      "mercado": "...",
+      "precio_clob": 0.5,
+      "take_profit": 0.7,
+      "stop_loss": 0.4,
+      "razonamiento": "...",
+      "evidencias": [
+        {"type": "A|B|C|D", "verifiability": 0.8, "consistency": 0.9, "corroborations": 2, "polarity": 1, "publishedAt": "2025-04-10"}
+      ]
+    }""", expected_output="JSON puro.", agent=cri)
 
     crew = Crew(agents=[inv, pes, cri], tasks=[t1, t2, t3], process=Process.sequential, verbose=False)
     output = str(crew.kickoff())
@@ -139,9 +152,26 @@ def ejecutar_mision_compra():
     try:
         clean_output = output[output.find("{"):output.rfind("}")+1]
         data = json.loads(clean_output)
+        
+        # Calcular Probabilidad Bayesiana al estilo Polyseer
+        p_mercado = data.get('precio_clob', 0.5)
+        evidencias = data.get('evidencias', [])
+        p_final = bayesian_engine.calculate_bayesian_probability(p_mercado, evidencias)
+        analisis = bayesian_engine.get_bayesian_summary(p_mercado, p_final)
+        
+        data['bayesian_score'] = analisis['score']
+        data['edge'] = analisis['edge']
+        data['sentiment'] = analisis['sentiment']
         data['fecha'] = obtener_hora_espana().strftime("%Y-%m-%d %H:%M:%S")
         data['estado'] = 'ABIERTA'
-        data['max_precio'] = data.get('precio_clob', 0.1)
+        data['max_precio'] = p_mercado
+
+        print(f"Resultado Bayesiano: {p_final:.3f} (Edge: {analisis['edge']})")
+
+        if data['accion'] == 'VETO' or analisis['edge'] < 0.03:
+            print(f"Veto o poco edge ({analisis['edge']}) para {data['mercado']}")
+            enviar_telegram(f"⚖️ *ANALISIS COMPLETADO*\nMercado: {data['mercado']}\nScore Bayesiano: {p_final:.2f}\nSentimiento: {analisis['sentiment']}\nAccion: VETO")
+            return
         
         if os.path.exists(HISTORIAL_CSV):
             df_check = pd.read_csv(HISTORIAL_CSV)
@@ -156,13 +186,17 @@ def ejecutar_mision_compra():
     except: pass
 
 if __name__ == "__main__":
-    print("🛰️ ARGO MOTOR V5 (COMITÉ + TRAILING SL) INICIADO...")
+    print("ARGO MOTOR V5 (COMITE + TRAILING SL) INICIADO...")
     informe_enviado_hoy = False
     ultimo_escaneo_compra = 0
     
     while True:
         try:
             ahora = obtener_hora_espana()
+            
+            # 0. Actualizar Heartbeat (Al inicio para marcar presencia)
+            with open(HEARTBEAT_FILE, "w") as f:
+                f.write(str(time.time()))
             
             # 1. Informe Diario a las 21:00
             if ahora.hour == 21 and ahora.minute == 0 and not informe_enviado_hoy:

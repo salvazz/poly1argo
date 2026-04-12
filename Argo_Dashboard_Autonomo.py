@@ -7,6 +7,7 @@ import re
 from datetime import datetime
 from dotenv import load_dotenv
 import pytz
+import time
 
 # Importaciones de CrewAI y Langchain (Groq)
 from crewai import Agent, Task, Crew
@@ -22,8 +23,20 @@ def obtener_hora_espana():
 # CONFIGURACIONES Y PERSISTENCIA GLOBAL
 # ==========================================
 load_dotenv()
-st.set_page_config(page_title="Argo Local - Agentes en Vivo", layout="wide")
 HISTORIAL_CSV = os.path.join(os.path.dirname(__file__), "data", "Argo_Historial.csv")
+HEARTBEAT_FILE = os.path.join(os.path.dirname(__file__), "data", "motor_heartbeat.txt")
+
+def verificar_motor():
+    """Verifica si el motor está activo leyendo el heartbeat."""
+    if os.path.exists(HEARTBEAT_FILE):
+        try:
+            with open(HEARTBEAT_FILE, "r") as f:
+                last_heartbeat = float(f.read().strip())
+            if time.time() - last_heartbeat < 180: # 3 minutos de margen
+                return "ONLINE 🟢"
+        except:
+            pass
+    return "OFFLINE 🔴"
 
 def cargar_historial():
     """Carga el historial de compras/ventas del archivo CSV local."""
@@ -291,7 +304,8 @@ with stat_col2:
     ventas = len([x for x in st.session_state["historial"] if x.get("Acción") == "COMPRAR"])
     st.metric("Operaciones", ventas, delta=f"+{ventas} hoy")
 with stat_col3:
-    st.metric("Estatus del Motor", "ONLINE 🟢", help="El motor 24/7 en segundo plano")
+    status_motor = verificar_motor()
+    st.metric("Estatus del Motor", status_motor, help="Verificando heartbeat del Motor 24/7")
 
 st.write("")
 
@@ -300,7 +314,23 @@ col_main, col_side = st.columns([3, 1])
 
 with col_side:
     st.markdown("### ⚙️ Centro de Mando")
-    api_key_input = st.text_input("Groq API Key (Secure)", type="password", value=os.environ.get("GROQ_API_KEY", ""))
+    
+    # Intento de detección manual robusta
+    try:
+        with open(os.path.join(os.path.dirname(__file__), ".env"), "r") as f:
+            for line in f:
+                if "GROQ_API_KEY=" in line:
+                    val = line.split("=")[1].strip().replace('"', '').replace("'", "")
+                    if len(val) > 10: os.environ["GROQ_API_KEY"] = val
+    except: pass
+    
+    api_key_env = os.environ.get("GROQ_API_KEY", "")
+    
+    if api_key_env and len(api_key_env) > 10:
+        st.success("🔒 ACCESO ENCRIPTADO Y OCULTO")
+        api_key_input = api_key_env
+    else:
+        api_key_input = st.text_input("Ingresar Groq API Key (Manual)", type="password")
     
     st.write("")
     if st.button("🚀 Ejecutar Análisis Manual", use_container_width=True):
