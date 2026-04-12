@@ -230,34 +230,48 @@ st.markdown("""
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Outfit:wght@300;400;600;800&display=swap');
     
     :root {
-        --glass-bg: rgba(255, 255, 255, 0.05);
-        --glass-border: rgba(255, 255, 255, 0.1);
-        --accent: #6366f1;
+        --glass-bg: rgba(17, 24, 39, 0.7);
+        --glass-border: rgba(255, 255, 255, 0.05);
+        --accent: #8b5cf6; /* Modern Violet */
         --success: #10b981;
         --warning: #f59e0b;
+        --text: #f8fafc;
     }
 
     .main {
-        background: radial-gradient(circle at top right, #111827, #000000);
+        background: #030712;
+        background-image: 
+            radial-gradient(at 0% 0%, rgba(139, 92, 246, 0.15) 0px, transparent 50%),
+            radial-gradient(at 100% 100%, rgba(16, 185, 129, 0.1) 0px, transparent 50%);
         font-family: 'Inter', sans-serif;
+        color: var(--text);
     }
     
     h1, h2, h3 {
         font-family: 'Outfit', sans-serif;
         font-weight: 800;
         letter-spacing: -0.02em;
+        background: linear-gradient(135deg, #fff 0%, #94a3b8 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
     }
 
     /* Glassmorphism Cards */
-    .stMetric {
-        background: var(--glass-bg);
-        border: 1px solid var(--glass-border);
-        padding: 20px;
-        border-radius: 15px;
-        box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
-        backdrop-filter: blur(4px);
+    div[data-testid="stMetric"] {
+        background: var(--glass-bg) !important;
+        border: 1px solid var(--glass-border) !important;
+        padding: 25px !important;
+        border-radius: 20px !important;
+        box-shadow: 0 10px 40px 0 rgba(0, 0, 0, 0.5) !important;
+        backdrop-filter: blur(12px) !important;
+        transition: transform 0.3s ease;
     }
     
+    div[data-testid="stMetric"]:hover {
+        transform: translateY(-5px);
+        border-color: var(--accent) !important;
+    }
+
     .stTabs [data-baseweb="tab-list"] {
         gap: 24px;
         background-color: transparent;
@@ -268,12 +282,22 @@ st.markdown("""
         background-color: transparent !important;
         border: none !important;
         font-weight: 600;
-        color: #94a3b8;
+        color: #64748b;
     }
 
     .stTabs [aria-selected="true"] {
         color: white !important;
         border-bottom: 2px solid var(--accent) !important;
+    }
+
+    /* Sidebar and other elements */
+    section[data-testid="stSidebar"] {
+        background-color: #030712 !important;
+        border-right: 1px solid var(--glass-border);
+    }
+
+    [data-testid="stHeader"] {
+        background: transparent !important;
     }
 
     /* Target specific mobile tweaks */
