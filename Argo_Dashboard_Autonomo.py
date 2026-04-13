@@ -472,24 +472,47 @@ import plotly.express as px
 # ... (funciones previas se mantienen)
 
 with col_main:
-    st.markdown("### 📈 Auditoría de Pensamiento")
-    audit_file = os.path.join(os.path.dirname(__file__), "data", "argo_audit.json")
-    if os.path.exists(audit_file):
-        try:
-            with open(audit_file, "r") as f:
-                audit_logs = json.load(f)
-            df_audit = pd.DataFrame(audit_logs)
-            st.dataframe(df_audit.style.applymap(lambda x: 'color: #10b981' if x == 'COMPRAR' else ('color: #ef4444' if x == 'VETO' else ''), subset=['accion']), use_container_width=True)
-        except:
-            st.info("Aún no hay registros de auditoría.")
-    else:
-        st.info("Esperando el primer escaneo del motor...")
+    tabs = st.tabs(["📊 Monitor", "💼 Cartera", "🧠 Inteligencia", "📜 Historial"])
     
-    st.write("")
-    st.markdown("### 📈 Rendimiento de la Flota")
-    if len(st.session_state["historial"]) > 0:
-        # Generar Curva de Capital (Simulada)
-        df_plot = pd.DataFrame(st.session_state["historial"])
+    with tabs[0]:
+        st.markdown("### 📈 Auditoría de Pensamiento")
+        audit_file = os.path.join(os.path.dirname(__file__), "data", "argo_audit.json")
+        if os.path.exists(audit_file):
+            try:
+                with open(audit_file, "r") as f:
+                    audit_logs = json.load(f)
+                df_audit = pd.DataFrame(audit_logs)
+                st.dataframe(df_audit.style.applymap(lambda x: 'color: #10b981' if x == 'COMPRAR' else ('color: #ef4444' if x == 'VETO' else ''), subset=['accion']), use_container_width=True)
+            except:
+                st.info("Aún no hay registros de auditoría.")
+        else:
+            st.info("Esperando el primer escaneo del motor...")
+            
+    with tabs[1]:
+        st.markdown("### 💼 Posiciones Abiertas")
+        historial = st.session_state["historial"]
+        abiertas = [h for h in historial if h.get("estado", "CERRADA") == "ABIERTA"]
+        if abiertas:
+            st.table(pd.DataFrame(abiertas)[["Mercado", "Precio", "TP", "SL", "Inversión"]])
+        else:
+            st.info("No hay posiciones abiertas en este momento.")
+
+    with tabs[2]:
+        st.markdown("### 🧠 Desglose de Evidencias Bayesianas")
+        st.write("Configuración del Motor:")
+        st.code("""
+        TYPE_CAPS = {'A': 1.0, 'B': 0.6, 'C': 0.3, 'D': 0.2} # Calibración Premium
+        LLM_PRIMARY = 'Groq Llama 3.3 70B'
+        LLM_FALLBACK = 'Gemini 1.5 Flash'
+        """, language="python")
+
+    with tabs[3]:
+        st.markdown("### 📜 Historial de Operaciones")
+        if len(st.session_state["historial"]) > 0:
+            df_hist = pd.DataFrame(st.session_state["historial"])
+            st.dataframe(df_hist, use_container_width=True)
+        else:
+            st.info("El historial está vacío.")
         df_plot['Inversión'] = pd.to_numeric(df_plot['Inversión'], errors='coerce')
         # Simulamos una curva simple: Restamos inversion si compra, sumamos aprox si cerramos (o mantenemos)
         df_plot['Balance'] = 50.0 - df_plot['Inversión'].cumsum()
