@@ -214,43 +214,62 @@ def ejecutar_mision_compra():
                 os.environ["OPENAI_API_BASE"] = "http://localhost:11434/v1"
                 os.environ["OPENAI_API_KEY"] = "ollama"
             
-            # RE-CREAR AGENTES EN CADA INTENTO...
+            # RE-CREAR AGENTES CON IDENTIDAD TÉCNICA AVANZADA
             inv = Agent(
-                role="Analista", 
-                goal="Busca noticias positivas sobre los mercados.", 
-                backstory="Optimista tecnológico. IMPORTANTE: Usa solo la herramienta de búsqueda disponible si la tienes, no inventes otras.", 
+                role="Analista Cuantitativo de Polymarket", 
+                goal="Detectar ineficiencias en el CLOB y arbitrajes intra-mercado.", 
+                backstory="Experto en algoritmos EIP-712 y Gamma API. Busca desfases de 30-90s entre CEX y Polymarket. Prioriza mercados con NegRisk:True para eficiencia de colateral.", 
                 tools=[search_tool] if search_tool else [], 
                 llm=b_modelo
             )
             pes = Agent(
-                role="Abogado del Diablo", 
-                goal="Encuentra razones para NO comprar.", 
-                backstory="Escéptico radical. Solo cree en los hechos negativos.", 
+                role="Auditor de Riesgos Off-Chain", 
+                goal="Identificar riesgos de resolución de oráculos (UMA) y anomalías de liquidez.", 
+                backstory="Escéptico de oráculos. Analiza la profundidad del CLOB y busca fallos en el arbitraje matemático de $1.00 que puedan causar pérdidas.", 
                 tools=[search_tool] if search_tool else [], 
                 llm=b_modelo
             )
             cri = Agent(
-                role="Gestor de Riesgos", 
-                goal="Decidir basándose en el análisis de los otros dos y emitir veredicto JSON.", 
-                backstory="Equilibrado y técnico.", 
+                role="Estratega Senior de Dublín (AWS Londres)", 
+                goal="Emitir veredictos basados en Criterio de Kelly y eficiencia de USDC.e.", 
+                backstory="Estratega jefe con enfoque en ejecución de baja latencia. Sus veredictos JSON son la ley técnica final del sistema.", 
                 llm=b_modelo
             )
 
-            # INTERFAZ DE TAREAS (Se recrean para asociarlas a los nuevos agentes)
-            t1 = Task(description=f"Analiza estos mercados y busca noticias positivas:\n{texto_mercados}", expected_output="Mercado candidato y por qué.", agent=inv)
-            t2 = Task(description="Analiza el candidato y busca TODA LA BASURA y noticias negativas. Destroza su argumento.", expected_output="Informe de riesgos.", agent=pes)
-            t3 = Task(description="""JSON FINAL con este formato exacto:
-            {
-              "accion": "COMPRAR" o "VETO",
-              "mercado": "...",
-              "precio_clob": 0.5,
-              "take_profit": 0.7,
-              "stop_loss": 0.4,
-              "razonamiento": "...",
-              "evidencias": [
-                {"type": "A|B|C|D", "verifiability": 0.8, "consistency": 0.9, "corroborations": 2, "polarity": 1, "publishedAt": "2025-04-10"}
-              ]
-            }""", expected_output="JSON puro.", agent=cri)
+            # INTERFAZ DE TAREAS CUANTITATIVAS (Prompt Maestro)
+            t1 = Task(
+                description=f"""Analiza el CLOB de estos mercados:
+                {texto_mercados}
+                Busca señales de Momentum entre CEX (Binance/Coinbase) y Polymarket. 
+                Identifica mercados con alta volatilidad y liquidez (Gamma API) donde haya un desfase de precio.""", 
+                expected_output="Candidato técnico con justificación de liquidez y momentum.", 
+                agent=inv
+            )
+            t2 = Task(
+                description="""Realiza una auditoría matemática:
+                1. ¿La suma de SÍ + NO en este mercado se desvía significativamente de $1.00? (Arbitraje).
+                2. ¿Existe riesgo de resolución por oráculo UMA?
+                3. Destroza el argumento alcista si el libro de órdenes es demasiado estrecho (spread alto).""", 
+                expected_output="Informe de riesgos cuantitativos y viabilidad de arbitraje.", 
+                agent=pes
+            )
+            t3 = Task(
+                description="""Genera el veredicto técnico final en JSON. 
+                Utiliza el Criterio de Kelly para sugerir el nivel de confianza.
+                Considera si NegRisk:True permite una mayor eficiencia de capital.
+                JSON FINAL:
+                {
+                  "accion": "COMPRAR" o "VETO",
+                  "mercado": "...",
+                  "precio_clob": 0.5,
+                  "take_profit": 0.7,
+                  "stop_loss": 0.4,
+                  "razonamiento_tecnico": "...",
+                  "evidencias": [...]
+                }""", 
+                expected_output="Bloque JSON técnico puro.", 
+                agent=cri
+            )
 
             # Definir la Crew con el modelo actual
             crew = Crew(agents=[inv, pes, cri], tasks=[t1, t2, t3], process=Process.sequential, verbose=False)
@@ -295,8 +314,12 @@ def ejecutar_mision_compra():
         p_final = bayesian_engine.calculate_bayesian_probability(p_mercado, evidencias)
         analisis = bayesian_engine.get_bayesian_summary(p_mercado, p_final)
         
+        # Recoger razonamiento (manejar ambas versiones del campo)
+        razon_final = data.get('razonamiento_tecnico') or data.get('razonamiento', "Sin detalles")
+        
         # Auditoría para Dashboard
-        registrar_log_audit(data['accion'], data['mercado'], p_final, data['razonamiento'])
+        registrar_log_audit(data['accion'], data['mercado'], p_final, razon_final)
+        data['razonamiento'] = razon_final
         data['bayesian_score'] = analisis['score']
         data['edge'] = analisis['edge']
         data['sentiment'] = analisis['sentiment']
