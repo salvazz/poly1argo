@@ -10,6 +10,7 @@ from crewai import Agent, Task, Crew, Process
 from crewai_tools import TavilySearchTool
 import bayesian_engine
 from google import genai
+import logging
 
 # Configuración de rutas
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -35,12 +36,17 @@ def enviar_telegram(mensaje):
 def obtener_datos_polymarket():
     mercados = []
     try:
+        # Aumentamos el límite para buscar más candidatos y filtrar por volatilidad
         r1 = requests.get("https://gamma-api.polymarket.com/events?limit=100&active=true&closed=false", timeout=10)
         for e in r1.json():
             vol = e.get("volume", 0)
+            # Filtro básico de liquidez para evitar mercados "muertos"
             if vol > 10000:
                 prices = e.get("outcomePrices", ["0", "0"])
                 if isinstance(prices, str): prices = json.loads(prices)
+                
+                # Volatilidad basada en el cambio de precio de 24h
+                # Si no existe el campo, asumimos 0
                 change = abs(e.get("oneDayPriceChange", 0))
                 
                 mercados.append({
@@ -54,6 +60,8 @@ def obtener_datos_polymarket():
         pass
     
     if not mercados: return []
+    
+    # Ordenamos por VOLATILIDAD (cambio absoluto de precio en 24h)
     mercados.sort(key=lambda x: x["volatilidad"], reverse=True)
     return mercados[:10]
 
@@ -78,12 +86,15 @@ def monitorear_y_vender():
             sl = row['SL']
             max_p = row['max_precio']
             
+            # Lógica Trailing SL: si el precio sube, subimos el SL (manteniendo distancia del 15% del maximo)
             if p_actual > max_p:
                 df.at[idx, 'max_precio'] = p_actual
+                # El nuevo SL no puede bajar, solo subir
                 nuevo_sl = max(sl, p_actual * 0.85)
                 df.at[idx, 'SL'] = nuevo_sl
                 print(f"Subiendo Trailing SL para {mercado} a {nuevo_sl:.2f}")
 
+            # Verificacion de cierre
             if p_actual >= tp:
                 df.at[idx, 'estado'] = 'CERRADA'
                 df.at[idx, 'precio_cierre'] = p_actual
@@ -98,21 +109,21 @@ def monitorear_y_vender():
 def enviar_informe_diario():
     if not os.path.exists(HISTORIAL_CSV): return
     df = pd.read_csv(HISTORIAL_CSV)
+    # Filtrar por hoy
     hoy_str = obtener_hora_espana().strftime("%Y-%m-%d")
-    df.columns = [c.strip() for c in df.columns]
-    if 'Fecha' in df.columns:
-        df_hoy = df[df['Fecha'].str.contains(hoy_str, na=False)]
-        total = len(df_hoy)
-        compras = len(df_hoy[df_hoy['Acción'] == 'COMPRAR'])
-        cerradas = len(df_hoy[df_hoy['estado'] == 'CERRADA'])
-        
-        msg = f"📊 *INFORME DIARIO ARGO*\n\n"
-        msg += f"📅 Fecha: {hoy_str}\n"
-        msg += f"🤖 Operaciones hoy: {total}\n"
-        msg += f"📥 Compras: {compras}\n"
-        msg += f"📤 Cierres ejecutados: {cerradas}\n\n"
-        msg += "¡Mañana más patrulla! 🚢"
-        enviar_telegram(msg)
+    df_hoy = df[df['fecha'].str.contains(hoy_str)]
+    
+    total = len(df_hoy)
+    compras = len(df_hoy[df_hoy['Acción'] == 'COMPRAR'])
+    cerradas = len(df_hoy[df_hoy['estado'] == 'CERRADA'])
+    
+    msg = f"📊 *INFORME DIARIO ARGO*\n\n"
+    msg += f"📅 Fecha: {hoy_str}\n"
+    msg += f"🤖 Operaciones hoy: {total}\n"
+    msg += f"📥 Compras: {compras}\n"
+    msg += f"📤 Cierres ejecutados: {cerradas}\n\n"
+    msg += "¡Mañana más patrulla! 🚢"
+    enviar_telegram(msg)
 
 def consultar_gemini_brain(mercado, precio):
     """Consulta a Gemini 1.5 Pro usando el nuevo SDK google-genai."""
@@ -121,6 +132,8 @@ def consultar_gemini_brain(mercado, precio):
     
     try:
         client = genai.Client(api_key=api_key)
+        
+        # Leer contexto del proyecto
         doc_path = os.path.join(BASE_DIR, "docs", "ARGO_V3_CONSOLIDATED.md")
         contexto = ""
         if os.path.exists(doc_path):
@@ -145,6 +158,7 @@ def consultar_gemini_brain(mercado, precio):
         return None
 
 def registrar_log_audit(accion, mercado, score, razon):
+    """Guarda un registro de cada análisis para el dashboard."""
     log_file = os.path.join(BASE_DIR, "data", "argo_audit.json")
     nuevo_log = {
         "fecha": datetime.now(SPAIN_TZ).strftime("%Y-%m-%d %H:%M:%S"),
@@ -161,7 +175,7 @@ def registrar_log_audit(accion, mercado, score, razon):
             logs = []
         logs.insert(0, nuevo_log)
         with open(log_file, "w") as f:
-            json.dump(logs[:50], f, indent=4)
+            json.dump(logs[:50], f, indent=4) # Guardamos los últimos 50
     except: pass
 
 def ejecutar_mision_compra():
@@ -179,8 +193,8 @@ def ejecutar_mision_compra():
         {"model": "groq/meta-llama/llama-4-scout-17b-16e-instruct", "tools": False},
         {"model": "groq/llama-3.1-8b-instant", "tools": False},
         {"model": "groq/qwen/qwen3-32b", "tools": False},
-        {"model": "gemini/gemini-1.5-flash", "tools": False}, 
-        {"model": "gemini/gemini-1.5-pro", "tools": False}
+        {"model": "gemini-1.5-flash", "tools": False},
+        {"model": "google/gemini-1.5-pro", "tools": False}
     ]
     exito_kickoff = False
     resultado_kickoff = None
@@ -190,11 +204,13 @@ def ejecutar_mision_compra():
         use_tools = backend_cfg["tools"]
         try:
             print(f"Intentando análisis con: {b_modelo} (Tools: {use_tools})...")
+            # Limpiar variables de entorno
             os.environ.pop("OPENAI_API_BASE", None)
             os.environ.pop("OPENAI_API_KEY", None)
             
             if "gemini" in b_modelo or "google" in b_modelo:
                 val_key = os.environ.get("GEMINI_API_KEY")
+                # LiteLLM/CrewAI pueden pedir cualquiera de estas dos
                 os.environ["GEMINI_API_KEY"] = val_key if val_key else ""
                 os.environ["GOOGLE_API_KEY"] = val_key if val_key else ""
             
@@ -202,16 +218,67 @@ def ejecutar_mision_compra():
                 os.environ["OPENAI_API_BASE"] = "http://localhost:11434/v1"
                 os.environ["OPENAI_API_KEY"] = "ollama"
             
+            # Herramientas limitadas para fallbacks
             active_tools = [search_tool] if (use_tools and search_tool) else []
             
-            inv = Agent(role="Analista Cuantitativo de Polymarket", goal="Detectar ineficiencias en el CLOB y arbitrajes.", backstory="Experto en Gamma API y momentum.", tools=active_tools, llm=b_modelo)
-            pes = Agent(role="Auditor de Riesgos", goal="Identificar riesgos de oráculo y liquidez.", backstory="Escéptico técnico de oráculos UMA.", tools=active_tools, llm=b_modelo)
-            cri = Agent(role="Estratega Senior", goal="Veredicto JSON final Kelly-based.", backstory="Estratega de baja latencia.", llm=b_modelo)
+            # RE-CREAR AGENTES
+            inv = Agent(
+                role="Analista Cuantitativo de Polymarket", 
+                goal="Detectar ineficiencias en el CLOB y arbitrajes.", 
+                backstory="Experto en Gamma API y momentum.", 
+                tools=active_tools, 
+                llm=b_modelo
+            )
+            pes = Agent(
+                role="Auditor de Riesgos", 
+                goal="Identificar riesgos de oráculo y liquidez.", 
+                backstory="Escéptico técnico de oráculos UMA.", 
+                tools=active_tools, 
+                llm=b_modelo
+            )
+            cri = Agent(
+                role="Estratega Senior", 
+                goal="Veredicto JSON final Kelly-based.", 
+                backstory="Estratega de baja latencia.", 
+                llm=b_modelo
+            )
 
-            t1 = Task(description=f"Analiza el CLOB de estos mercados:\n{texto_mercados}\nBusca señales de Momentum entre CEX (Binance/Coinbase) y Polymarket.", expected_output="Candidato técnico con justificación de liquidez y momentum.", agent=inv)
-            t2 = Task(description="Realiza una auditoría matemática:\n1. ¿La suma de SÍ + NO en este mercado se desvía significativamente de $1.00?\n2. ¿Existe riesgo de resolución por oráculo UMA?", expected_output="Informe de riesgos cuantitativos y viabilidad de arbitraje.", agent=pes)
-            t3 = Task(description="Genera el veredicto técnico final en JSON. JSON FINAL:\n{\n  \"accion\": \"COMPRAR\" o \"VETO\",\n  \"mercado\": \"...\",\n  \"precio_clob\": 0.5,\n  \"take_profit\": 0.7,\n  \"stop_loss\": 0.4,\n  \"razonamiento_tecnico\": \"...\",\n  \"evidencias\": [...]\n}", expected_output="Bloque JSON técnico puro.", agent=cri)
+            # INTERFAZ DE TAREAS CUANTITATIVAS (Prompt Maestro)
+            t1 = Task(
+                description=f"""Analiza el CLOB de estos mercados:
+                {texto_mercados}
+                Busca señales de Momentum entre CEX (Binance/Coinbase) y Polymarket. 
+                Identifica mercados con alta volatilidad y liquidez (Gamma API) donde haya un desfase de precio.""", 
+                expected_output="Candidato técnico con justificación de liquidez y momentum.", 
+                agent=inv
+            )
+            t2 = Task(
+                description="""Realiza una auditoría matemática:
+                1. ¿La suma de SÍ + NO en este mercado se desvía significativamente de $1.00? (Arbitraje).
+                2. ¿Existe riesgo de resolución por oráculo UMA?
+                3. Destroza el argumento alcista si el libro de órdenes es demasiado estrecho (spread alto).""", 
+                expected_output="Informe de riesgos cuantitativos y viabilidad de arbitraje.", 
+                agent=pes
+            )
+            t3 = Task(
+                description="""Genera el veredicto técnico final en JSON. 
+                Utiliza el Criterio de Kelly para sugerir el nivel de confianza.
+                Considera si NegRisk:True permite una mayor eficiencia de capital.
+                JSON FINAL:
+                {
+                  "accion": "COMPRAR" o "VETO",
+                  "mercado": "...",
+                  "precio_clob": 0.5,
+                  "take_profit": 0.7,
+                  "stop_loss": 0.4,
+                  "razonamiento_tecnico": "...",
+                  "evidencias": [...]
+                }""", 
+                expected_output="Bloque JSON técnico puro.", 
+                agent=cri
+            )
 
+            # Definir la Crew con el modelo actual
             crew = Crew(agents=[inv, pes, cri], tasks=[t1, t2, t3], process=Process.sequential, verbose=False)
             resultado_kickoff = crew.kickoff()
             exito_kickoff = True
@@ -219,6 +286,7 @@ def ejecutar_mision_compra():
         except Exception as e:
             error_msg = str(e)
             print(f"Error en {b_modelo}: {error_msg}")
+            # Informe detallado al usuario para diagnóstico en tiempo real
             emoji = "🔄" if ("429" in error_msg or "rate_limit" in error_msg.lower()) else "⚠️"
             enviar_telegram(f"{emoji} *FALLO:* {b_modelo}\nMotivo: {error_msg[:120]}...")
             registrar_log_audit("ERROR", "Sistema", 0, f"Fallo en {b_modelo}: {error_msg}")
@@ -229,18 +297,18 @@ def ejecutar_mision_compra():
         return
 
     output = str(resultado_kickoff)
+    
     try:
         clean_output = output[output.find("{"):output.rfind("}")+1]
         data = json.loads(clean_output)
         p_mercado = float(data.get('precio_clob', 0.5))
         
-        evidencias = data.get('evidencias', [])
-        if not isinstance(evidencias, list): evidencias = []
-        
+        # Calcular Probabilidad Bayesiana al estilo Polyseer
+        # 4. Cerebro de Contexto (Gemini / NotebookLM)
         brain_decision = consultar_gemini_brain(data['mercado'], p_mercado)
         if brain_decision:
             evidencia_brain = {
-                "type": "A",
+                "type": "A", # Máxima prioridad
                 "verifiability": brain_decision.get("confianza", 0.7),
                 "consistency": 1.0 if brain_decision.get("veredicto") == "FUERTE" else 0.5,
                 "corroborations": 1,
@@ -248,28 +316,32 @@ def ejecutar_mision_compra():
                 "publishedAt": datetime.now().strftime("%Y-%m-%d")
             }
             evidencias.append(evidencia_brain)
+            print(f"Cerebro Gemini: {brain_decision.get('veredicto')} (Confianza: {brain_decision.get('confianza')})")
         
         p_final = bayesian_engine.calculate_bayesian_probability(p_mercado, evidencias)
         analisis = bayesian_engine.get_bayesian_summary(p_mercado, p_final)
         
+        # Recoger razonamiento (manejar ambas versiones del campo)
         razon_final = data.get('razonamiento_tecnico') or data.get('razonamiento', "Sin detalles")
+        
+        # Auditoría para Dashboard
         registrar_log_audit(data['accion'], data['mercado'], p_final, razon_final)
         data['razonamiento'] = razon_final
         data['bayesian_score'] = analisis['score']
         data['edge'] = analisis['edge']
         data['sentiment'] = analisis['sentiment']
-        data['Fecha'] = obtener_hora_espana().strftime("%Y-%m-%d %H:%M:%S")
+        data['fecha'] = obtener_hora_espana().strftime("%Y-%m-%d %H:%M:%S")
         data['estado'] = 'ABIERTA'
         data['max_precio'] = p_mercado
 
+        print(f"Resultado Bayesiano: {p_final:.3f} (Edge: {analisis['edge']})")
+
         if data['accion'] == 'VETO' or analisis['edge'] < 0.03:
+            razon = "VETO" if data['accion'] == 'VETO' else f"POCO EDGE ({analisis['edge']})"
+            print(f"Rechazado: {razon} para {data['mercado']}")
+            enviar_telegram(f"⚖️ *ANALISIS COMPLETADO*\nMercado: {data['mercado']}\nScore Bayesiano: {p_final:.2f}\nSentimiento: {analisis['sentiment']}\nAccion: {razon}")
             return
         
-        sl_val = float(data.get('stop_loss', 0.4))
-        if not (0 < sl_val < p_mercado):
-            sl_val = p_mercado * 0.90
-        data['stop_loss'] = sl_val
-
         if os.path.exists(HISTORIAL_CSV):
             df_check = pd.read_csv(HISTORIAL_CSV)
             if data['mercado'] in df_check[df_check['estado'] == 'ABIERTA']['Mercado'].values: return
@@ -280,9 +352,7 @@ def ejecutar_mision_compra():
         df_final.to_csv(HISTORIAL_CSV, index=False)
         if data['accion'] == "COMPRAR":
             enviar_telegram(f"⚖️ *COMITÉ HA DECIDIDO: COMPRA*\n*Mercado:* {data['mercado']}\n*Veredicto:* {data['razonamiento'][:100]}...")
-    except Exception as e:
-        print(f"Error procesando resultado JSON: {e}")
-        registrar_log_audit("ERROR_PARSE", "Sistema", 0, str(e))
+    except: pass
 
 if __name__ == "__main__":
     print("ARGO MOTOR V5 (COMITE + TRAILING SL) INICIADO...")
