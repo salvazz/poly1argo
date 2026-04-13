@@ -214,20 +214,39 @@ def ejecutar_mision_compra():
       ]
     }""", expected_output="JSON puro.", agent=cri)
 
-    crew = Crew(agents=[inv, pes, cri], tasks=[t1, t2, t3], process=Process.sequential, verbose=False)
+    backends = ["groq/llama-3.3-70b-versatile", "gemini/gemini-1.5-flash", "ollama/llama3.1"]
+    exito_kickoff = False
+    resultado_kickoff = None
     
-    try:
-        resultado_kickoff = crew.kickoff()
-    except Exception as e:
-        if "429" in str(e) or "rate_limit" in str(e).lower():
-            print("⚠️ GROQ AGOTADO - Activando Fallback a Gemini Flash...")
-            enviar_telegram("🔄 *FALLBACK:* Groq agotado. Usando Gemini para este ciclo.")
+    for b_modelo in backends:
+        try:
+            print(f"Intentando análisis con: {b_modelo}...")
             for agent in [inv, pes, cri]:
-                agent.llm = "gemini/gemini-1.5-flash"
-            resultado_kickoff = crew.kickoff()
-        else:
-            raise e
+                agent.llm = b_modelo
             
+            # Si es Ollama, configurar host local (para cuando corre en tu laptop)
+            if "ollama" in b_modelo:
+                os.environ["OPENAI_API_BASE"] = "http://localhost:11434/v1"
+                os.environ["OPENAI_API_KEY"] = "ollama"
+            
+            resultado_kickoff = crew.kickoff()
+            exito_kickoff = True
+            break # Salimos si tiene éxito
+        except Exception as e:
+            error_str = str(e).lower()
+            if "429" in error_str or "rate_limit" in error_str or "connection" in error_str:
+                aviso = f"⚠️ Fallo en {b_modelo}. Intentando siguiente backend..."
+                print(aviso)
+                enviar_telegram(f"🔄 *CAMBIO DE BACKEND:* {aviso}")
+                continue
+            else:
+                print(f"Error crítico en {b_modelo}: {e}")
+                break
+
+    if not exito_kickoff:
+        enviar_telegram("🚨 *COLAPSO DE IA:* Todos los modelos (Groq, Gemini, Ollama) han fallado o están inaccesibles. El motor entrará en espera.")
+        return
+
     output = str(resultado_kickoff)
     
     try:
