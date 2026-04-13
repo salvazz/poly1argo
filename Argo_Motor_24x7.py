@@ -228,7 +228,8 @@ def ejecutar_mision_compra():
             print(f"Intentando análisis con: {b_modelo}...")
             # Configurar variables según el proveedor
             if "google_generative_ai" in b_modelo:
-                os.environ["GEMINI_API_KEY"] = os.environ.get("GEMINI_API_KEY", "")
+                val_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+                os.environ["GOOGLE_API_KEY"] = val_key
             if "ollama" in b_modelo:
                 os.environ["OPENAI_API_BASE"] = "http://localhost:11434/v1"
                 os.environ["OPENAI_API_KEY"] = "ollama"
@@ -239,16 +240,17 @@ def ejecutar_mision_compra():
             resultado_kickoff = crew.kickoff()
             exito_kickoff = True
             break
+            # ... (resto del bucle)
+            ultimo_escaneo_compra = time.time()
+            break
         except Exception as e:
-            error_str = str(e).lower()
-            if "429" in error_str or "rate_limit" in error_str or "connection" in error_str:
-                aviso = f"⚠️ Fallo en {b_modelo}. Intentando siguiente backend..."
-                print(aviso)
-                enviar_telegram(f"🔄 *CAMBIO DE BACKEND:* {aviso}")
-                continue
+            error_msg = str(e)
+            print(f"Error en {b_modelo}: {error_msg}")
+            if "429" in error_msg or "rate_limit" in error_msg.lower():
+                enviar_telegram(f"🔄 *LIMITE:* {b_modelo} agotado. Saltando...")
             else:
-                print(f"Error crítico en {b_modelo}: {e}")
-                break
+                registrar_log_audit("ERROR", "Sistema", 0, f"Fallo en {b_modelo}: {error_msg}")
+            continue
 
     if not exito_kickoff:
         enviar_telegram("🚨 *COLAPSO DE IA:* Todos los modelos (Groq, Gemini, Ollama) han fallado o están inaccesibles. El motor entrará en espera.")
