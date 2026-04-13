@@ -9,6 +9,7 @@ from dotenv import load_dotenv
 from crewai import Agent, Task, Crew, Process
 from crewai_tools import TavilySearchTool
 import bayesian_engine
+import google.generativeai as genai
 
 # Configuración de rutas
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -123,6 +124,43 @@ def enviar_informe_diario():
     msg += "¡Mañana más patrulla! 🚢"
     enviar_telegram(msg)
 
+def consultar_gemini_brain(mercado, precio):
+    """Consulta a Gemini 1.5 Pro actuando como la base de conocimiento de NotebookLM."""
+    api_key = os.environ.get("GEMINI_API_KEY")
+    if not api_key: return None
+    
+    try:
+        genai.configure(api_key=api_key)
+        model = genai.GenerativeModel('gemini-1.5-pro')
+        
+        # Leer contexto del proyecto (Símil NotebookLM)
+        doc_path = os.path.join(BASE_DIR, "docs", "ARGO_V3_CONSOLIDATED.md")
+        contexto = ""
+        if os.path.exists(doc_path):
+            with open(doc_path, "r", encoding="utf-8") as f:
+                contexto = f.read()[:30000] # Capamos a 30k tokens para velocidad
+                
+        prompt = f"""
+        ACTÚA COMO UN ESTRATEGA DE TRADING DE ALTO NIVEL (NotebookLM AI).
+        CONTEXTO DEL PROYECTO:
+        {contexto}
+        
+        MERCADO A ANALIZAR: {mercado}
+        PRECIO ACTUAL: {precio}
+        
+        Analiza si este mercado encaja con la filosofía estricta de ARGO V3.
+        Devuelve un JSON con:
+        - "veredicto": "FUERTE" | "DEBIL" | "EVITAR"
+        - "confianza": 0.0 a 1.0
+        - "razon": "..."
+        """
+        response = model.generate_content(prompt)
+        text = response.text
+        clean_json = text[text.find("{"):text.rfind("}")+1]
+        return json.loads(clean_json)
+    except:
+        return None
+
 def ejecutar_mision_compra():
     api_key = os.environ.get("GROQ_API_KEY")
     tavily_key = os.environ.get("TAVILY_API_KEY")
@@ -167,8 +205,20 @@ def ejecutar_mision_compra():
         data = json.loads(clean_output)
         
         # Calcular Probabilidad Bayesiana al estilo Polyseer
-        p_mercado = data.get('precio_clob', 0.5)
-        evidencias = data.get('evidencias', [])
+        # 4. Cerebro de Contexto (Gemini / NotebookLM)
+        brain_decision = consultar_gemini_brain(data['mercado'], p_mercado)
+        if brain_decision:
+            evidencia_brain = {
+                "type": "A", # Máxima prioridad
+                "verifiability": brain_decision.get("confianza", 0.7),
+                "consistency": 1.0 if brain_decision.get("veredicto") == "FUERTE" else 0.5,
+                "corroborations": 1,
+                "polarity": 1 if brain_decision.get("veredicto") != "EVITAR" else -1,
+                "publishedAt": datetime.now().strftime("%Y-%m-%d")
+            }
+            evidencias.append(evidencia_brain)
+            print(f"Cerebro Gemini: {brain_decision.get('veredicto')} (Confianza: {brain_decision.get('confianza')})")
+        
         p_final = bayesian_engine.calculate_bayesian_probability(p_mercado, evidencias)
         analisis = bayesian_engine.get_bayesian_summary(p_mercado, p_final)
         
