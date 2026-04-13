@@ -216,9 +216,9 @@ def ejecutar_mision_compra():
 
     backends = [
         "groq/llama-3.3-70b-versatile",
-        "groq/mixtral-8x7b-32768", # Mayor cuota en Groq
-        "google_generative_ai/gemini-1.5-flash",
-        "ollama/llama3.1"
+        "groq/llama-3.1-8b-instant",       # Alta cuota en Groq
+        "gemini/gemini-1.5-flash",           # Respaldo externo
+        "ollama/llama3.1"                    # Respaldo local
     ]
     exito_kickoff = False
     resultado_kickoff = None
@@ -227,9 +227,11 @@ def ejecutar_mision_compra():
         try:
             print(f"Intentando análisis con: {b_modelo}...")
             # Configurar variables según el proveedor
-            if "google_generative_ai" in b_modelo:
+            if "gemini" in b_modelo:
                 val_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
                 os.environ["GOOGLE_API_KEY"] = val_key
+                os.environ["GEMINI_API_KEY"] = val_key
+            
             if "ollama" in b_modelo:
                 os.environ["OPENAI_API_BASE"] = "http://localhost:11434/v1"
                 os.environ["OPENAI_API_KEY"] = "ollama"
