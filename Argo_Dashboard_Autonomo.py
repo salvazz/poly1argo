@@ -128,7 +128,7 @@ def obtener_datos_polymarket():
 def misiones_argo(api_key, saldo_actual, backend="Groq"):
     if backend == "Groq":
         os.environ["GROQ_API_KEY"] = api_key
-        modelo_ia = "groq/llama-3.1-70b-versatile"
+        modelo_ia = "groq/llama-3.3-70b-versatile"
     else:
         # Configuración para Ollama Local
         # Importación tardía para no penalizar si no se usa

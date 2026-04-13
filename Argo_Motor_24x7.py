@@ -133,7 +133,7 @@ def ejecutar_mision_compra():
     texto_mercados = "\n".join([f"- {m['titulo']} | Precio: {m['precio']:.2f} | Volatilidad (24h): {m['volatilidad']*100:+.2f}%" for m in mercados])
     
     search_tool = TavilySearchTool(k=3) if tavily_key else None
-    modelo = "groq/llama-3.1-70b-versatile"
+    modelo = "groq/llama-3.3-70b-versatile"
     
     # 1. El Investigador
     inv = Agent(role="Analista", goal="Busca noticias positivas sobre los mercados.", backstory="Optimista tecnológico. IMPORTANTE: Usa solo la herramienta de búsqueda disponible si la tienes, no inventes otras.", tools=[search_tool] if search_tool else [], llm=modelo)
