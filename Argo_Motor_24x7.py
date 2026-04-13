@@ -186,34 +186,8 @@ def ejecutar_mision_compra():
     mercados = obtener_datos_polymarket()
     if not mercados: return
     texto_mercados = "\n".join([f"- {m['titulo']} | Precio: {m['precio']:.2f} | Volatilidad (24h): {m['volatilidad']*100:+.2f}%" for m in mercados])
-    
     search_tool = TavilySearchTool(k=3) if tavily_key else None
-    modelo = "groq/llama-3.3-70b-versatile"
     
-    # 1. El Investigador
-    inv = Agent(role="Analista", goal="Busca noticias positivas sobre los mercados.", backstory="Optimista tecnológico. IMPORTANTE: Usa solo la herramienta de búsqueda disponible si la tienes, no inventes otras.", tools=[search_tool] if search_tool else [], llm=modelo)
-    
-    # 2. El PESIMISTA (Abogado del diablo)
-    pes = Agent(role="Abogado del Diablo", goal="Encuentra razones para NO comprar.", backstory="Escéptico radical. Solo cree en los hechos negativos.", tools=[search_tool] if search_tool else [], llm=modelo)
-    
-    # 3. El Crítico (Veredicto)
-    cri = Agent(role="Gestor de Riesgos", goal="Decidir basandose en ambos.", backstory="Equilibrado y técnico.", llm=modelo)
-
-    t1 = Task(description=f"Analiza estos mercados y busca noticias positivas:\n{texto_mercados}", expected_output="Mercado candidato y por qué.", agent=inv)
-    t2 = Task(description="Analiza el candidato y busca TODA LA BASURA y noticias negativas. Destroza su argumento.", expected_output="Informe de riesgos.", agent=pes)
-    t3 = Task(description="""JSON FINAL con este formato exacto:
-    {
-      "accion": "COMPRAR" o "VETO",
-      "mercado": "...",
-      "precio_clob": 0.5,
-      "take_profit": 0.7,
-      "stop_loss": 0.4,
-      "razonamiento": "...",
-      "evidencias": [
-        {"type": "A|B|C|D", "verifiability": 0.8, "consistency": 0.9, "corroborations": 2, "polarity": 1, "publishedAt": "2025-04-10"}
-      ]
-    }""", expected_output="JSON puro.", agent=cri)
-
     backends = [
         "groq/llama-3.3-70b-versatile",
         "groq/llama-3.1-8b-instant",
@@ -235,9 +209,44 @@ def ejecutar_mision_compra():
                 os.environ["OPENAI_API_BASE"] = "http://localhost:11434/v1"
                 os.environ["OPENAI_API_KEY"] = "ollama"
             
-            for agent in [inv, pes, cri]:
-                agent.llm = b_modelo
-            
+            # RE-CREAR AGENTES EN CADA INTENTO PARA ASEGURAR RESOLUCIÓN DE LLM
+            inv = Agent(
+                role="Analista", 
+                goal="Busca noticias positivas sobre los mercados.", 
+                backstory="Optimista tecnológico. IMPORTANTE: Usa solo la herramienta de búsqueda disponible si la tienes, no inventes otras.", 
+                tools=[search_tool] if search_tool else [], 
+                llm=b_modelo
+            )
+            pes = Agent(
+                role="Abogado del Diablo", 
+                goal="Encuentra razones para NO comprar.", 
+                backstory="Escéptico radical. Solo cree en los hechos negativos.", 
+                tools=[search_tool] if search_tool else [], 
+                llm=b_modelo
+            )
+            cri = Agent(
+                role="Gestor de Riesgos", 
+                goal="Decidir basándose en el análisis de los otros dos y emitir veredicto JSON.", 
+                backstory="Equilibrado y técnico.", 
+                llm=b_modelo
+            )
+
+            # INTERFAZ DE TAREAS (Se recrean para asociarlas a los nuevos agentes)
+            t1 = Task(description=f"Analiza estos mercados y busca noticias positivas:\n{texto_mercados}", expected_output="Mercado candidato y por qué.", agent=inv)
+            t2 = Task(description="Analiza el candidato y busca TODA LA BASURA y noticias negativas. Destroza su argumento.", expected_output="Informe de riesgos.", agent=pes)
+            t3 = Task(description="""JSON FINAL con este formato exacto:
+            {
+              "accion": "COMPRAR" o "VETO",
+              "mercado": "...",
+              "precio_clob": 0.5,
+              "take_profit": 0.7,
+              "stop_loss": 0.4,
+              "razonamiento": "...",
+              "evidencias": [
+                {"type": "A|B|C|D", "verifiability": 0.8, "consistency": 0.9, "corroborations": 2, "polarity": 1, "publishedAt": "2025-04-10"}
+              ]
+            }""", expected_output="JSON puro.", agent=cri)
+
             # Definir la Crew con el modelo actual
             crew = Crew(agents=[inv, pes, cri], tasks=[t1, t2, t3], process=Process.sequential, verbose=False)
             resultado_kickoff = crew.kickoff()
