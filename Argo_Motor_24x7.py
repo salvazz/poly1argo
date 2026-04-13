@@ -200,16 +200,21 @@ def ejecutar_mision_compra():
     for b_modelo in backends:
         try:
             print(f"Intentando análisis con: {b_modelo}...")
+            # Limpiar variables de entorno para evitar 'envenenamiento' de proveedores previos
+            os.environ.pop("OPENAI_API_BASE", None)
+            os.environ.pop("OPENAI_API_KEY", None)
+            os.environ.pop("GOOGLE_API_KEY", None)
+
             # Configurar variables según el proveedor
             if "gemini" in b_modelo:
-                val_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+                val_key = os.environ.get("GEMINI_API_KEY")
                 os.environ["GOOGLE_API_KEY"] = val_key
-                os.environ["GEMINI_API_KEY"] = val_key
+            
             if "ollama" in b_modelo:
                 os.environ["OPENAI_API_BASE"] = "http://localhost:11434/v1"
                 os.environ["OPENAI_API_KEY"] = "ollama"
             
-            # RE-CREAR AGENTES EN CADA INTENTO PARA ASEGURAR RESOLUCIÓN DE LLM
+            # RE-CREAR AGENTES EN CADA INTENTO...
             inv = Agent(
                 role="Analista", 
                 goal="Busca noticias positivas sobre los mercados.", 
