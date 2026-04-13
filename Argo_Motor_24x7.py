@@ -216,9 +216,9 @@ def ejecutar_mision_compra():
 
     backends = [
         "groq/llama-3.3-70b-versatile",
-        "groq/llama-3.1-8b-instant",       # Alta cuota en Groq
-        "gemini/gemini-1.5-flash",           # Respaldo externo
-        "ollama/llama3.1"                    # Respaldo local
+        "groq/llama-3.1-8b-instant",
+        "gemini/gemini-1.5-flash",
+        "ollama/llama3.1"
     ]
     exito_kickoff = False
     resultado_kickoff = None
@@ -231,7 +231,6 @@ def ejecutar_mision_compra():
                 val_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
                 os.environ["GOOGLE_API_KEY"] = val_key
                 os.environ["GEMINI_API_KEY"] = val_key
-            
             if "ollama" in b_modelo:
                 os.environ["OPENAI_API_BASE"] = "http://localhost:11434/v1"
                 os.environ["OPENAI_API_KEY"] = "ollama"
@@ -239,11 +238,10 @@ def ejecutar_mision_compra():
             for agent in [inv, pes, cri]:
                 agent.llm = b_modelo
             
+            # Definir la Crew con el modelo actual
+            crew = Crew(agents=[inv, pes, cri], tasks=[t1, t2, t3], process=Process.sequential, verbose=False)
             resultado_kickoff = crew.kickoff()
             exito_kickoff = True
-            break
-            # ... (resto del bucle)
-            ultimo_escaneo_compra = time.time()
             break
         except Exception as e:
             error_msg = str(e)
@@ -255,7 +253,7 @@ def ejecutar_mision_compra():
             continue
 
     if not exito_kickoff:
-        enviar_telegram("🚨 *COLAPSO DE IA:* Todos los modelos (Groq, Gemini, Ollama) han fallado o están inaccesibles. El motor entrará en espera.")
+        enviar_telegram("🚨 *COLAPSO DE IA:* Todos los modelos han fallado. El motor entrará en espera.")
         return
 
     output = str(resultado_kickoff)
