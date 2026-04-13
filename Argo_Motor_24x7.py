@@ -189,50 +189,54 @@ def ejecutar_mision_compra():
     search_tool = TavilySearchTool(k=3) if tavily_key else None
     
     backends = [
-        "groq/llama-3.3-70b-versatile",
-        "groq/llama-3.1-70b-versatile",
-        "gemini/gemini-1.5-flash-latest",
-        "ollama/llama3.1"
+        {"model": "groq/llama-3.3-70b-versatile", "tools": True},
+        {"model": "groq/llama-3.1-70b-versatile", "tools": True},
+        {"model": "gemini/gemini-1.5-flash", "tools": False}, # Sin herramientas para asegurar éxito
+        {"model": "ollama/llama3.1", "tools": False}
     ]
     exito_kickoff = False
     resultado_kickoff = None
     
-    for b_modelo in backends:
+    for backend_cfg in backends:
+        b_modelo = backend_cfg["model"]
+        use_tools = backend_cfg["tools"]
         try:
-            print(f"Intentando análisis con: {b_modelo}...")
-            # Limpiar variables de entorno para evitar 'envenenamiento' de proveedores previos
+            print(f"Intentando análisis con: {b_modelo} (Tools: {use_tools})...")
+            # Limpiar variables de entorno
             os.environ.pop("OPENAI_API_BASE", None)
             os.environ.pop("OPENAI_API_KEY", None)
-            os.environ.pop("GOOGLE_API_KEY", None)
-
-            # Configurar variables según el proveedor
+            
             if "gemini" in b_modelo:
                 val_key = os.environ.get("GEMINI_API_KEY")
+                os.environ["GEMINI_API_KEY"] = val_key
                 os.environ["GOOGLE_API_KEY"] = val_key
             
             if "ollama" in b_modelo:
                 os.environ["OPENAI_API_BASE"] = "http://localhost:11434/v1"
                 os.environ["OPENAI_API_KEY"] = "ollama"
             
-            # RE-CREAR AGENTES CON IDENTIDAD TÉCNICA AVANZADA
+            # Herramientas limitadas para fallbacks
+            active_tools = [search_tool] if (use_tools and search_tool) else []
+            
+            # RE-CREAR AGENTES
             inv = Agent(
                 role="Analista Cuantitativo de Polymarket", 
-                goal="Detectar ineficiencias en el CLOB y arbitrajes intra-mercado.", 
-                backstory="Experto en algoritmos EIP-712 y Gamma API. Busca desfases de 30-90s entre CEX y Polymarket. Prioriza mercados con NegRisk:True para eficiencia de colateral.", 
-                tools=[search_tool] if search_tool else [], 
+                goal="Detectar ineficiencias en el CLOB y arbitrajes.", 
+                backstory="Experto en Gamma API y momentum.", 
+                tools=active_tools, 
                 llm=b_modelo
             )
             pes = Agent(
-                role="Auditor de Riesgos Off-Chain", 
-                goal="Identificar riesgos de resolución de oráculos (UMA) y anomalías de liquidez.", 
-                backstory="Escéptico de oráculos. Analiza la profundidad del CLOB y busca fallos en el arbitraje matemático de $1.00 que puedan causar pérdidas.", 
-                tools=[search_tool] if search_tool else [], 
+                role="Auditor de Riesgos", 
+                goal="Identificar riesgos de oráculo y liquidez.", 
+                backstory="Escéptico técnico de oráculos UMA.", 
+                tools=active_tools, 
                 llm=b_modelo
             )
             cri = Agent(
-                role="Estratega Senior de Dublín (AWS Londres)", 
-                goal="Emitir veredictos basados en Criterio de Kelly y eficiencia de USDC.e.", 
-                backstory="Estratega jefe con enfoque en ejecución de baja latencia. Sus veredictos JSON son la ley técnica final del sistema.", 
+                role="Estratega Senior", 
+                goal="Veredicto JSON final Kelly-based.", 
+                backstory="Estratega de baja latencia.", 
                 llm=b_modelo
             )
 
