@@ -189,11 +189,12 @@ def ejecutar_mision_compra():
     search_tool = TavilySearchTool(k=3) if tavily_key else None
     
     backends = [
+        {"model": "groq/deepseek-r1-distill-llama-70b", "tools": True},
         {"model": "groq/llama-3.3-70b-versatile", "tools": True},
         {"model": "groq/llama-3.1-8b-instant", "tools": False},
         {"model": "groq/mixtral-8x7b-32768", "tools": False},
-        {"model": "google_generative_ai/gemini-1.5-flash", "tools": False},
-        {"model": "google_generative_ai/gemini-1.5-pro", "tools": False}
+        {"model": "gemini/gemini-1.5-flash", "tools": False},
+        {"model": "gemini/gemini-1.5-pro", "tools": False}
     ]
     exito_kickoff = False
     resultado_kickoff = None
@@ -207,10 +208,11 @@ def ejecutar_mision_compra():
             os.environ.pop("OPENAI_API_BASE", None)
             os.environ.pop("OPENAI_API_KEY", None)
             
-            if "gemini" in b_modelo:
+            if "gemini" in b_modelo or "google" in b_modelo:
                 val_key = os.environ.get("GEMINI_API_KEY")
-                os.environ["GEMINI_API_KEY"] = val_key
-                os.environ["GOOGLE_API_KEY"] = val_key
+                # LiteLLM/CrewAI pueden pedir cualquiera de estas dos
+                os.environ["GEMINI_API_KEY"] = val_key if val_key else ""
+                os.environ["GOOGLE_API_KEY"] = val_key if val_key else ""
             
             if "ollama" in b_modelo:
                 os.environ["OPENAI_API_BASE"] = "http://localhost:11434/v1"
@@ -284,10 +286,10 @@ def ejecutar_mision_compra():
         except Exception as e:
             error_msg = str(e)
             print(f"Error en {b_modelo}: {error_msg}")
-            if "429" in error_msg or "rate_limit" in error_msg.lower():
-                enviar_telegram(f"🔄 *LIMITE:* {b_modelo} agotado. Saltando...")
-            else:
-                registrar_log_audit("ERROR", "Sistema", 0, f"Fallo en {b_modelo}: {error_msg}")
+            # Informe detallado al usuario para diagnóstico en tiempo real
+            emoji = "🔄" if ("429" in error_msg or "rate_limit" in error_msg.lower()) else "⚠️"
+            enviar_telegram(f"{emoji} *FALLO:* {b_modelo}\nMotivo: {error_msg[:120]}...")
+            registrar_log_audit("ERROR", "Sistema", 0, f"Fallo en {b_modelo}: {error_msg}")
             continue
 
     if not exito_kickoff:
