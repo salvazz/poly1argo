@@ -190,9 +190,10 @@ def ejecutar_mision_compra():
     
     backends = [
         {"model": "groq/llama-3.3-70b-versatile", "tools": True},
-        {"model": "groq/llama-3.1-8b-instant", "tools": False},   # Respaldo rápido y alta cuota
-        {"model": "gemini/gemini-1.5-flash", "tools": False},     # Respaldo nube externo
-        {"model": "ollama/llama3.1", "tools": False}
+        {"model": "groq/llama-3.1-8b-instant", "tools": False},
+        {"model": "groq/mixtral-8x7b-32768", "tools": False},
+        {"model": "google_generative_ai/gemini-1.5-flash", "tools": False},
+        {"model": "google_generative_ai/gemini-1.5-pro", "tools": False}
     ]
     exito_kickoff = False
     resultado_kickoff = None

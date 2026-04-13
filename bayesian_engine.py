@@ -5,14 +5,16 @@ import datetime
 # CONFIGURACIÓN DE PESOS (Inspirado en Polyseer)
 # ------------------------------------------------------------------------------
 TYPE_CAPS = {"A": 1.0, "B": 0.6, "C": 0.3, "D": 0.2}
-WEIGHTS = {"v": 0.45, "r": 0.25, "u": 0.15, "t": 0.15}
+WEIGHTS = {"v": 0.45, "r": 0.25, "c": 0.15, "t": 0.15} # 'c' = Consistency
+LOGIT_MAX = 0.9999
+LOGIT_MIN = 0.0001
 
 def clamp(x, lo, hi):
     return min(hi, max(lo, x))
 
 def logit(p):
-    if p >= 1: p = 0.9999
-    if p <= 0: p = 0.0001
+    if p >= 1: p = LOGIT_MAX
+    if p <= 0: p = LOGIT_MIN
     return math.log(p / (1 - p))
 
 def sigmoid(x):
@@ -30,7 +32,7 @@ def recency_score(published_at_str):
         half_life = 120
         score = 1 / (1 + days / half_life)
         return clamp(score, 0, 1)
-    except:
+    except (ValueError, TypeError, AttributeError):
         return 0.5
 
 def r_from_corroborations(k, k0=1.0):
@@ -58,7 +60,7 @@ def calculate_log_lr(evidence_item):
     
     polarity = evidence_item.get('polarity', 1)
     
-    val = polarity * cap * (WEIGHTS['v']*ver + WEIGHTS['r']*r + WEIGHTS['u']*cons + WEIGHTS['t']*t)
+    val = polarity * cap * (WEIGHTS['v']*ver + WEIGHTS['r']*r + WEIGHTS['c']*cons + WEIGHTS['t']*t)
     return clamp(val, -cap, cap)
 
 def calculate_bayesian_probability(p_market, evidence_list):
