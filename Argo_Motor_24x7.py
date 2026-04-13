@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 from crewai import Agent, Task, Crew, Process
 from crewai_tools import TavilySearchTool
 import bayesian_engine
-import google.generativeai as genai
+from google import genai
 
 # Configuración de rutas
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -125,40 +125,35 @@ def enviar_informe_diario():
     enviar_telegram(msg)
 
 def consultar_gemini_brain(mercado, precio):
-    """Consulta a Gemini 1.5 Pro actuando como la base de conocimiento de NotebookLM."""
+    """Consulta a Gemini 1.5 Pro usando el nuevo SDK google-genai."""
     api_key = os.environ.get("GEMINI_API_KEY")
     if not api_key: return None
     
     try:
-        genai.configure(api_key=api_key)
-        model = genai.GenerativeModel('gemini-1.5-pro')
+        client = genai.Client(api_key=api_key)
         
-        # Leer contexto del proyecto (Símil NotebookLM)
+        # Leer contexto del proyecto
         doc_path = os.path.join(BASE_DIR, "docs", "ARGO_V3_CONSOLIDATED.md")
         contexto = ""
         if os.path.exists(doc_path):
             with open(doc_path, "r", encoding="utf-8") as f:
-                contexto = f.read()[:30000] # Capamos a 30k tokens para velocidad
+                contexto = f.read()[:30000]
                 
         prompt = f"""
-        ACTÚA COMO UN ESTRATEGA DE TRADING DE ALTO NIVEL (NotebookLM AI).
-        CONTEXTO DEL PROYECTO:
-        {contexto}
-        
-        MERCADO A ANALIZAR: {mercado}
-        PRECIO ACTUAL: {precio}
-        
-        Analiza si este mercado encaja con la filosofía estricta de ARGO V3.
-        Devuelve un JSON con:
-        - "veredicto": "FUERTE" | "DEBIL" | "EVITAR"
-        - "confianza": 0.0 a 1.0
-        - "razon": "..."
+        ACTÚA COMO UN ESTRATEGA DE TRADING (NotebookLM AI).
+        CONTEXTO: {contexto}
+        MERCADO: {mercado} | PRECIO: {precio}
+        Devuelve JSON: {{"veredicto": "FUERTE"|"DEBIL"|"EVITAR", "confianza": 0.0-1.0, "razon": "..."}}
         """
-        response = model.generate_content(prompt)
+        response = client.models.generate_content(
+            model='gemini-1.5-pro',
+            contents=prompt
+        )
         text = response.text
         clean_json = text[text.find("{"):text.rfind("}")+1]
         return json.loads(clean_json)
-    except:
+    except Exception as e:
+        print(f"Error Gemini Brain: {e}")
         return None
 
 def ejecutar_mision_compra():
