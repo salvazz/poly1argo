@@ -10,6 +10,7 @@ from crewai import Agent, Task, Crew, Process
 from crewai_tools import TavilySearchTool
 import bayesian_engine
 from google import genai
+import logging
 
 # Configuración de rutas
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -156,6 +157,27 @@ def consultar_gemini_brain(mercado, precio):
         print(f"Error Gemini Brain: {e}")
         return None
 
+def registrar_log_audit(accion, mercado, score, razon):
+    """Guarda un registro de cada análisis para el dashboard."""
+    log_file = os.path.join(BASE_DIR, "data", "argo_audit.json")
+    nuevo_log = {
+        "fecha": datetime.now(SPAIN_TZ).strftime("%Y-%m-%d %H:%M:%S"),
+        "accion": accion,
+        "mercado": mercado,
+        "score": round(score, 3) if score else 0,
+        "razon": razon[:100] + "..."
+    }
+    try:
+        if os.path.exists(log_file):
+            with open(log_file, "r") as f:
+                logs = json.load(f)
+        else:
+            logs = []
+        logs.insert(0, nuevo_log)
+        with open(log_file, "w") as f:
+            json.dump(logs[:50], f, indent=4) # Guardamos los últimos 50
+    except: pass
+
 def ejecutar_mision_compra():
     api_key = os.environ.get("GROQ_API_KEY")
     tavily_key = os.environ.get("TAVILY_API_KEY")
@@ -193,11 +215,25 @@ def ejecutar_mision_compra():
     }""", expected_output="JSON puro.", agent=cri)
 
     crew = Crew(agents=[inv, pes, cri], tasks=[t1, t2, t3], process=Process.sequential, verbose=False)
-    output = str(crew.kickoff())
+    
+    try:
+        resultado_kickoff = crew.kickoff()
+    except Exception as e:
+        if "429" in str(e) or "rate_limit" in str(e).lower():
+            print("⚠️ GROQ AGOTADO - Activando Fallback a Gemini Flash...")
+            enviar_telegram("🔄 *FALLBACK:* Groq agotado. Usando Gemini para este ciclo.")
+            for agent in [inv, pes, cri]:
+                agent.llm = "gemini/gemini-1.5-flash"
+            resultado_kickoff = crew.kickoff()
+        else:
+            raise e
+            
+    output = str(resultado_kickoff)
     
     try:
         clean_output = output[output.find("{"):output.rfind("}")+1]
         data = json.loads(clean_output)
+        p_mercado = float(data.get('precio_clob', 0.5))
         
         # Calcular Probabilidad Bayesiana al estilo Polyseer
         # 4. Cerebro de Contexto (Gemini / NotebookLM)
@@ -217,6 +253,8 @@ def ejecutar_mision_compra():
         p_final = bayesian_engine.calculate_bayesian_probability(p_mercado, evidencias)
         analisis = bayesian_engine.get_bayesian_summary(p_mercado, p_final)
         
+        # Auditoría para Dashboard
+        registrar_log_audit(data['accion'], data['mercado'], p_final, data['razonamiento'])
         data['bayesian_score'] = analisis['score']
         data['edge'] = analisis['edge']
         data['sentiment'] = analisis['sentiment']

@@ -472,6 +472,20 @@ import plotly.express as px
 # ... (funciones previas se mantienen)
 
 with col_main:
+    st.markdown("### 📈 Auditoría de Pensamiento")
+    audit_file = os.path.join(os.path.dirname(__file__), "data", "argo_audit.json")
+    if os.path.exists(audit_file):
+        try:
+            with open(audit_file, "r") as f:
+                audit_logs = json.load(f)
+            df_audit = pd.DataFrame(audit_logs)
+            st.dataframe(df_audit.style.applymap(lambda x: 'color: #10b981' if x == 'COMPRAR' else ('color: #ef4444' if x == 'VETO' else ''), subset=['accion']), use_container_width=True)
+        except:
+            st.info("Aún no hay registros de auditoría.")
+    else:
+        st.info("Esperando el primer escaneo del motor...")
+    
+    st.write("")
     st.markdown("### 📈 Rendimiento de la Flota")
     if len(st.session_state["historial"]) > 0:
         # Generar Curva de Capital (Simulada)
