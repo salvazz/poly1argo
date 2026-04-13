@@ -214,24 +214,31 @@ def ejecutar_mision_compra():
       ]
     }""", expected_output="JSON puro.", agent=cri)
 
-    backends = ["groq/llama-3.3-70b-versatile", "gemini/gemini-1.5-flash", "ollama/llama3.1"]
+    backends = [
+        "groq/llama-3.3-70b-versatile",
+        "groq/mixtral-8x7b-32768", # Mayor cuota en Groq
+        "google_generative_ai/gemini-1.5-flash",
+        "ollama/llama3.1"
+    ]
     exito_kickoff = False
     resultado_kickoff = None
     
     for b_modelo in backends:
         try:
             print(f"Intentando análisis con: {b_modelo}...")
-            for agent in [inv, pes, cri]:
-                agent.llm = b_modelo
-            
-            # Si es Ollama, configurar host local (para cuando corre en tu laptop)
+            # Configurar variables según el proveedor
+            if "google_generative_ai" in b_modelo:
+                os.environ["GEMINI_API_KEY"] = os.environ.get("GEMINI_API_KEY", "")
             if "ollama" in b_modelo:
                 os.environ["OPENAI_API_BASE"] = "http://localhost:11434/v1"
                 os.environ["OPENAI_API_KEY"] = "ollama"
             
+            for agent in [inv, pes, cri]:
+                agent.llm = b_modelo
+            
             resultado_kickoff = crew.kickoff()
             exito_kickoff = True
-            break # Salimos si tiene éxito
+            break
         except Exception as e:
             error_str = str(e).lower()
             if "429" in error_str or "rate_limit" in error_str or "connection" in error_str:
