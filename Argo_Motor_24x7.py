@@ -190,8 +190,8 @@ def ejecutar_mision_compra():
     
     backends = [
         "groq/llama-3.3-70b-versatile",
-        "groq/llama-3.1-8b-instant",
-        "gemini/gemini-1.5-flash",
+        "groq/llama-3.1-70b-versatile",
+        "gemini/gemini-1.5-flash-latest",
         "ollama/llama3.1"
     ]
     exito_kickoff = False
