@@ -189,11 +189,11 @@ def ejecutar_mision_compra():
     search_tool = TavilySearchTool(k=3) if tavily_key else None
     
     backends = [
-        {"model": "groq/llama-3.3-70b-versatile", "tools": True},
-        {"model": "groq/meta-llama/llama-4-scout-17b-16e-instruct", "tools": True},
+        {"model": "groq/llama-3.3-70b-versatile", "tools": False},
+        {"model": "groq/meta-llama/llama-4-scout-17b-16e-instruct", "tools": False},
         {"model": "groq/llama-3.1-8b-instant", "tools": False},
         {"model": "groq/qwen/qwen3-32b", "tools": False},
-        {"model": "gemini-1.5-flash", "tools": False}, # Simplificado, LiteLLM resolverá
+        {"model": "gemini-1.5-flash", "tools": False},
         {"model": "google/gemini-1.5-pro", "tools": False}
     ]
     exito_kickoff = False
