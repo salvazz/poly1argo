@@ -509,38 +509,19 @@ with col_main:
     with tabs[3]:
         st.markdown("### 📜 Historial de Operaciones")
         if len(st.session_state["historial"]) > 0:
-            df_hist = pd.DataFrame(st.session_state["historial"])
-            st.dataframe(df_hist, use_container_width=True)
+            df_plot = pd.DataFrame(st.session_state["historial"])
+            st.dataframe(df_plot, use_container_width=True)
+            
+            df_plot['Inversión'] = pd.to_numeric(df_plot['Inversión'], errors='coerce')
+            df_plot['Balance'] = 50.0 - df_plot['Inversión'].cumsum()
+            
+            fig = px.line(df_plot, x='Fecha', y='Balance', title='Evolución del Saldo (Simulado)',
+                         line_shape='spline', markers=True)
+            fig.update_traces(line_color='#6366f1')
+            fig.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font_color='white')
+            st.plotly_chart(fig, use_container_width=True)
         else:
             st.info("El historial está vacío.")
-        df_plot['Inversión'] = pd.to_numeric(df_plot['Inversión'], errors='coerce')
-        # Simulamos una curva simple: Restamos inversion si compra, sumamos aprox si cerramos (o mantenemos)
-        df_plot['Balance'] = 50.0 - df_plot['Inversión'].cumsum()
-        
-        fig = px.line(df_plot, x='Fecha', y='Balance', title='Evolución del Saldo (Simulado)',
-                     line_shape='spline', markers=True)
-        fig.update_traces(line_color='#6366f1')
-        fig.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font_color='white')
-        st.plotly_chart(fig, use_container_width=True)
 
-    t_history, t_brain = st.tabs(["📊 Historial de Patrullaje", "🧠 Procesamiento de Señal"])
-    
-    with t_history:
-        if len(st.session_state["historial"]) > 0:
-            df = pd.DataFrame(st.session_state["historial"])
-            
-            # Filtro de estado si existe
-            if 'estado' in df.columns:
-                st.write("Filtrar por estado:")
-                st.dataframe(df, use_container_width=True)
-            else:
-                st.dataframe(df, use_container_width=True)
-        else:
-            st.info("Sin anomalías detectadas. El sistema está en guardia.")
-
-
-    with t_brain:
-        if "ultimo_veredicto" in st.session_state:
-            st.json(st.session_state["ultimo_veredicto"])
-        else:
-            st.write("Esperando señal del motor...")
+    st.write("---")
+    st.caption("Argo V3.5 Platinum - Hedge Fund Autónomo")
