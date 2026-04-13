@@ -125,9 +125,15 @@ def obtener_datos_polymarket():
     lineas = [f"- [{m['categoria']}] {m['titulo']} | Precio: {m['precio']:.2f} | Volatilidad: {m['volatilidad']*100:+.2f}% | Vol: ${m['volumen']:,.0f}" for m in mercados[:10]]
     return "TOP 10 MERCADOS POR VOLATILIDAD (24H):\n" + "\n".join(lineas)
 
-def misiones_argo(api_key, saldo_actual):
-    os.environ["GROQ_API_KEY"] = api_key
-    modelo_ia = "groq/llama-3.1-8b-instant"
+def misiones_argo(api_key, saldo_actual, backend="Groq"):
+    if backend == "Groq":
+        os.environ["GROQ_API_KEY"] = api_key
+        modelo_ia = "groq/llama-3.1-70b-versatile"
+    else:
+        # Configuración para Ollama Local
+        # Importación tardía para no penalizar si no se usa
+        from langchain_community.llms import Ollama
+        modelo_ia = Ollama(model="llama3.1", base_url="http://localhost:11434")
     
     # Pre-cargamos datos reales de Polymarket
     datos_mercado = obtener_datos_polymarket()
@@ -425,12 +431,16 @@ with col_side:
         api_key_input = st.text_input("Ingresar Groq API Key (Manual)", type="password")
     
     st.write("")
+    backend_mode = st.radio("🤖 Backend de IA", ["Groq (Nube)", "Ollama (Local)"], help="Usa Ollama si alcanzas el límite de Groq.")
+    backend_val = "Ollama" if "Ollama" in backend_mode else "Groq"
+    
+    st.write("")
     if st.button("🚀 Ejecutar Análisis Manual", use_container_width=True):
-        if not api_key_input:
-            st.error("Falta API Key")
+        if backend_val == "Groq" and not api_key_input:
+            st.error("Falta API Key de Groq")
         else:
-            with st.spinner("🧠 Sincronizando agentes con la red..."):
-                resultado_bruto = str(misiones_argo(api_key_input, st.session_state["saldo"]))
+            with st.spinner(f"🧠 Sincronizando con backend {backend_val}..."):
+                resultado_bruto = str(misiones_argo(api_key_input, st.session_state["saldo"], backend=backend_val))
                 st.session_state["ultimo_veredicto"] = resultado_bruto
                 
                 try:

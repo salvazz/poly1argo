@@ -133,10 +133,10 @@ def ejecutar_mision_compra():
     texto_mercados = "\n".join([f"- {m['titulo']} | Precio: {m['precio']:.2f} | Volatilidad (24h): {m['volatilidad']*100:+.2f}%" for m in mercados])
     
     search_tool = TavilySearchTool(k=3) if tavily_key else None
-    modelo = "groq/llama-3.1-8b-instant"
+    modelo = "groq/llama-3.1-70b-versatile"
     
     # 1. El Investigador
-    inv = Agent(role="Analista", goal="Busca noticias positivas.", backstory="Optimista tecnológico.", tools=[search_tool] if search_tool else [], llm=modelo)
+    inv = Agent(role="Analista", goal="Busca noticias positivas sobre los mercados.", backstory="Optimista tecnológico. IMPORTANTE: Usa solo la herramienta de búsqueda disponible si la tienes, no inventes otras.", tools=[search_tool] if search_tool else [], llm=modelo)
     
     # 2. El PESIMISTA (Abogado del diablo)
     pes = Agent(role="Abogado del Diablo", goal="Encuentra razones para NO comprar.", backstory="Escéptico radical. Solo cree en los hechos negativos.", tools=[search_tool] if search_tool else [], llm=modelo)
@@ -182,8 +182,9 @@ def ejecutar_mision_compra():
         print(f"Resultado Bayesiano: {p_final:.3f} (Edge: {analisis['edge']})")
 
         if data['accion'] == 'VETO' or analisis['edge'] < 0.03:
-            print(f"Veto o poco edge ({analisis['edge']}) para {data['mercado']}")
-            enviar_telegram(f"⚖️ *ANALISIS COMPLETADO*\nMercado: {data['mercado']}\nScore Bayesiano: {p_final:.2f}\nSentimiento: {analisis['sentiment']}\nAccion: VETO")
+            razon = "VETO" if data['accion'] == 'VETO' else f"POCO EDGE ({analisis['edge']})"
+            print(f"Rechazado: {razon} para {data['mercado']}")
+            enviar_telegram(f"⚖️ *ANALISIS COMPLETADO*\nMercado: {data['mercado']}\nScore Bayesiano: {p_final:.2f}\nSentimiento: {analisis['sentiment']}\nAccion: {razon}")
             return
         
         if os.path.exists(HISTORIAL_CSV):
@@ -221,8 +222,8 @@ if __name__ == "__main__":
             # 2. Monitoreo rapido (Trailing SL)
             monitorear_y_vender()
             
-            # 3. Escaneo de compras cada 10 min
-            if time.time() - ultimo_escaneo_compra > 600:
+            # 3. Escaneo de compras cada 20 min (Ajustado para durar más la cuota de tokens)
+            if time.time() - ultimo_escaneo_compra > 1200:
                 ejecutar_mision_compra()
                 ultimo_escaneo_compra = time.time()
                 
