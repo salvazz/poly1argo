@@ -127,7 +127,7 @@ def obtener_datos_polymarket():
 
 def misiones_argo(api_key, saldo_actual):
     os.environ["GROQ_API_KEY"] = api_key
-    modelo_ia = "groq/llama-3.3-70b-versatile"
+    modelo_ia = "groq/llama-3.1-8b-instant"
     
     # Pre-cargamos datos reales de Polymarket
     datos_mercado = obtener_datos_polymarket()
