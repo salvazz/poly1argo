@@ -5,10 +5,10 @@ Sistema de trading predictivo de alto rendimiento para **Polymarket** utilizando
 ## 📈 Características Principales
 
 *   **Motor Bayesiano de Alta Fidelidad**: Cálculo de probabilidad basado en evidencias (inspirado en Polyseer).
-*   **Comité de Agentes (CrewAI)**: Tres especialistas (Analista, Auditor de Riesgos y Estratega) colaboran en cada operación.
+*   **Comité de Agentes (CrewAI)**: Tres especialistas supervisados por un Cerebro Gemini.
 *   **Dashboard Platinum**: Interfaz premium en Streamlit para monitoreo 24/7.
 *   **Vigilante Robusto (Watchdog)**: Sistema de salud y control vía Telegram con hilos dedicados.
-*   **Trailing Stop Loss Dinámico**: Gestión automatizada de salidas para asegurar beneficios.
+*   **Control de Riesgos**: Implementación de Trailing Stop Loss y Criterio de Kelly.
 
 ## 🚀 Instalación y Setup
 
@@ -27,28 +27,20 @@ Sistema de trading predictivo de alto rendimiento para **Polymarket** utilizando
     ```
 
 3.  **Variables de Entorno (.env)**:
-    Crea un archivo `.env` en la raíz con:
-    ```env
-    GROQ_API_KEY=tu_clave
-    GEMINI_API_KEY=tu_clave
-    TAVILY_API_KEY=tu_clave
-    TELEGRAM_TOKEN=tu_token
-    CHAT_ID=tu_id
-    ```
+    Crea un archivo `.env` en la raíz con tus claves de Groq, Gemini, Tavily y Telegram.
 
-## 🛠️ Uso del Ecosistema
+## 🛠️ Archivos Reales del Proyecto
 
-*   **Motor Principal**: `python Argo_Motor_24x7.py` (Mantiene el sistema activo e invierte).
-*   **Dashboard**: `streamlit run Argo_Dashboard_Autonomo.py` (Interfaz visual).
-*   **Watchdog**: `python Argo_Watchdog.py` (Monitoreo de salud y comandos Telegram).
-*   **Simulación**: `python simulate_trading.py` (Evalúa estrategias sin riesgo).
-*   **Tests**: `python run_test_bayesian.py` (Lanza un análisis de prueba).
+*   **Argo_Motor_24x7.py**: El motor principal que ejecuta el bucle de trading infinito.
+*   **Argo_Dashboard_Autonomo.py**: Dashboard interactivo para visualizar el estado y las evidencias.
+*   **Argo_Watchdog.py**: Vigilante que reinicia el sistema si falla y responde comandos por Telegram.
+*   **bayesian_engine.py**: El núcleo matemático del sistema.
+*   **simulate_trading.py**: Simulador de Monte Carlo para probar el edge de la IA.
 
 ## 🛡️ Seguridad
 
-*   El archivo `oracle.key` ha sido revocado y eliminado del rastreo.
-*   El sistema utiliza firmas HMAC y EIP-712 para interactuar con Polymarket.
-*   Todas las operaciones se auditan en `data/argo_audit.json`.
+*   `oracle.key` está en el `.gitignore` y no debe ser compartido.
+*   Las claves API se gestionan exclusivamente vía `.env`.
 
 ---
 *Este proyecto tiene fines educativos y de investigación cuantitativa.*
