@@ -9,3 +9,4 @@ google-genai
 litellm
 plotly
 psutil
+langchain-community

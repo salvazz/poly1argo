@@ -6,6 +6,7 @@ import threading
 from datetime import datetime
 from dotenv import load_dotenv
 import psutil
+# import signal  # No usado
 
 # Configuración
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))

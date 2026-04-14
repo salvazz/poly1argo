@@ -6,7 +6,7 @@ capital_inicial = 50
 operaciones_objetivo = 300
 historial = []
 saldo_actual = capital_inicial
-VENTAJA_IA_EDGE = 0.05  # 5% de Edge sobre el precio del mercado
+VENTAJA_IA_EDGE = 0.05  # 5% de Edge relativo sobre el precio del mercado
 
 print(
     f"Iniciando simulacion de {operaciones_objetivo} operaciones con capital inicial de ${capital_inicial}..."
@@ -20,9 +20,9 @@ for i in range(1, operaciones_objetivo + 1):
     if cuota <= 0:
         continue
 
-    # 2. La IA estima la probabilidad real (P_real = cuota + edge)
+    # 2. La IA estima la probabilidad real (P_real = cuota * (1 + edge))
     # Solo operamos si detectamos valor esperado positivo (Edge)
-    p_estimada = cuota + VENTAJA_IA_EDGE
+    p_estimada = cuota * (1 + VENTAJA_IA_EDGE)
 
     # 3. El Gestor de Riesgos decide invertir el 5% del saldo actual
     monto_apuesta = round(saldo_actual * 0.05, 2)
