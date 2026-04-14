@@ -6,7 +6,7 @@ capital_inicial = 50
 operaciones_objetivo = 300
 historial = []
 saldo_actual = capital_inicial
-VENTAJA_IA_EDGE = 0.05 # 5% de Edge sobre el precio del mercado
+VENTAJA_IA_EDGE = 0.05  # 5% de Edge sobre el precio del mercado
 
 print(
     f"Iniciando simulacion de {operaciones_objetivo} operaciones con capital inicial de ${capital_inicial}..."
@@ -15,19 +15,20 @@ print(
 for i in range(1, operaciones_objetivo + 1):
     # 1. El Investigador encuentra una cuota (precio del mercado entre 0.15 y 0.85)
     cuota = round(random.uniform(0.15, 0.85), 2)
-    
+
     # Protección ante división por cero o cuota inválida
-    if cuota <= 0: continue
+    if cuota <= 0:
+        continue
 
     # 2. La IA estima la probabilidad real (P_real = cuota + edge)
     # Solo operamos si detectamos valor esperado positivo (Edge)
     p_estimada = cuota + VENTAJA_IA_EDGE
-    
+
     # 3. El Gestor de Riesgos decide invertir el 5% del saldo actual
     monto_apuesta = round(saldo_actual * 0.05, 2)
 
-    # 4. Simulación del resultado basado en la probabilidad real (p_estimada)
-    exito = random.random() < p_estimada
+    # 4. Simulación del resultado basado en la probabilidad real del mercado (cuota)
+    exito = random.random() < cuota
 
     if exito:
         beneficio = monto_apuesta * (1 / cuota - 1)
@@ -40,7 +41,7 @@ for i in range(1, operaciones_objetivo + 1):
     # Guardar en el historial
     historial.append(
         {
-            "Operacion": i, # Evitamos caracteres especiales por seguridad de encoding
+            "Operacion": i,  # Evitamos caracteres especiales por seguridad de encoding
             "Cuota": cuota,
             "Inversion": monto_apuesta,
             "Resultado": resultado,
@@ -64,4 +65,4 @@ print(
 )
 
 # Exportar con encoding explícito
-df_resultados.to_csv("Simulacion_Resultados.csv", index=False, encoding='utf-8')
+df_resultados.to_csv("Simulacion_Resultados.csv", index=False, encoding="utf-8")

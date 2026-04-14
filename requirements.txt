@@ -8,3 +8,4 @@ crewai-tools
 google-genai
 litellm
 plotly
+psutil

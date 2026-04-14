@@ -5,18 +5,15 @@ from crewai import Agent, Task, Crew
 
 load_dotenv()
 
+
 def test_backends():
-    backends = [
-        "groq/llama-3.3-70b-versatile",
-        "groq/mixtral-8x7b-32768",
-        "google_generative_ai/gemini-1.5-flash",
-        "ollama/llama3.1"
-    ]
-    
+    backends = ["ollama/llama3.1", "ollama/gemma2:9b", "gemini/gemini-2.5-flash"]
+
     # Reducir verbosidad de logs
     import logging
+
     logging.getLogger("litellm").setLevel(logging.CRITICAL)
-    
+
     for b in backends:
         print(f"--- TEST: {b} ---")
         try:
@@ -25,15 +22,19 @@ def test_backends():
             if "ollama" in b:
                 os.environ["OPENAI_API_BASE"] = "http://localhost:11434/v1"
                 os.environ["OPENAI_API_KEY"] = "ollama"
-            
+
             a = Agent(role="Test", goal="Say hi", backstory="Test", llm=b)
             t = Task(description="Say hi", expected_output="Hi", agent=a)
             c = Crew(agents=[a], tasks=[t])
-            res = c.kickoff()
-            print(f"SUCCESS: {res}")
+            try:
+                res = c.kickoff()
+                print(f"SUCCESS: {res}")
+            except Exception as e:
+                print(f"FAIL: {e}")
         except Exception as e:
             print(f"FAIL: {e}")
         print("\n")
+
 
 if __name__ == "__main__":
     test_backends()
