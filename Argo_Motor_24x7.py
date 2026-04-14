@@ -135,12 +135,12 @@ def ejecutar_mision_compra():
     )
     search_tool = TavilySearchTool(k=3) if tavily_key else None
 
-    # BUG 4: Modelos locales y Gemini
+    # BUG 4: Priorizar modelos cloud (Gemini) sobre locales
     backends = [
-        {"model": "ollama/llama3.1", "tools": False},
-        {"model": "ollama/gemma2:9b", "tools": False},
         {"model": "gemini/gemini-2.5-flash", "tools": False},
         {"model": "gemini/gemini-2.5-pro", "tools": False},
+        {"model": "ollama/llama3.1", "tools": False},
+        {"model": "ollama/gemma2:9b", "tools": False}
     ]
     exito_kickoff = False
     resultado_kickoff = None
