@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  argo-motor:
+    build: .
+    container_name: argo-motor
+    volumes:
+      - ./data:/app/data
+      - ./.env:/app/.env
+    restart: unless-stopped
+    command: python Argo_Motor_24x7.py
+
+  argo-dashboard:
+    build: .
+    container_name: argo-dashboard
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./data:/app/data
+      - ./.env:/app/.env
+    restart: unless-stopped
+    command: streamlit run Argo_Dashboard_Autonomo.py --server.address 0.0.0.0 --server.port 8501
+
+  argo-watchdog:
+    build: .
+    container_name: argo-watchdog
+    volumes:
+      - ./data:/app/data
+      - ./.env:/app/.env
+    restart: unless-stopped
+    command: python Argo_Watchdog.py
