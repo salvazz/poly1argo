@@ -165,10 +165,7 @@ def misiones_argo(api_key, saldo_actual, backend="Groq"):
     return str(resultado)
 
 
-# BUG 7 B: UI de Streamlit a nivel raíz (indentación 0)
-st.set_page_config(
-    page_title="Argo V3 | Autonomous Trading", page_icon="🚢", layout="wide"
-)
+# BUG 7 B: UI de Streamlit a nivel raíz (indentación 0) corregido (se removió set_page_config duplicado)
 
 st.markdown(
     """
