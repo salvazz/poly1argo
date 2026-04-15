@@ -287,6 +287,53 @@ def ejecutar_mision_compra():
             actualizar_aprendizaje(modelo_usado, False, "parse_error")
 
 
+def monitorear_y_vender():
+    """Vigilancia con TRAILING STOP LOSS."""
+    if not os.path.exists(HISTORIAL_CSV):
+        return
+    df = pd.read_csv(HISTORIAL_CSV)
+    if "estado" not in df.columns:
+        df["estado"] = "ABIERTA"
+    if "max_precio" not in df.columns:
+        df["max_precio"] = df["Precio"]
+
+    abiertas = df[df["estado"] == "ABIERTA"]
+    if abiertas.empty:
+        return
+
+    mercados_actuales = obtener_datos_polymarket()
+    precios_map = {m["titulo"]: m["precio"] for m in mercados_actuales}
+
+    for idx, row in abiertas.iterrows():
+        mercado = row["Mercado"]
+        if mercado in precios_map:
+            p_actual = precios_map[mercado]
+            tp = row["TP"]
+            sl = row["SL"]
+            max_p = row["max_precio"]
+
+            if p_actual > max_p:
+                df.at[idx, "max_precio"] = p_actual
+                nuevo_sl = max(sl, p_actual * 0.85)
+                df.at[idx, "SL"] = nuevo_sl
+                print(f"Subiendo Trailing SL para {mercado} a {nuevo_sl:.2f}")
+
+            if p_actual >= tp:
+                df.at[idx, "estado"] = "CERRADA"
+                df.at[idx, "precio_cierre"] = p_actual
+                enviar_telegram(
+                    f"💰 *TP ALCANZADO (+profit)*\n{mercado}\nCierre: {p_actual}"
+                )
+            elif p_actual <= df.at[idx, "SL"]:
+                df.at[idx, "estado"] = "CERRADA"
+                df.at[idx, "precio_cierre"] = p_actual
+                enviar_telegram(
+                    f"🛡️ *TRAILING SL DISPARADO*\n{mercado}\nCierre: {p_actual}"
+                )
+
+    df.to_csv(HISTORIAL_CSV, index=False)
+
+
 if __name__ == "__main__":
     while True:
         try:
