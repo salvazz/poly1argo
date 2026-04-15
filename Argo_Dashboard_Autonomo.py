@@ -19,6 +19,7 @@ import time
 from crewai import Agent, Task, Crew
 from crewai.tools import tool
 import bayesian_engine
+from Argo_Motor_24x7 import ejecutar_mision_compra, monitorear_y_vender
 
 # Configuración de zona horaria España
 SPAIN_TZ = pytz.timezone("Europe/Madrid")
@@ -261,6 +262,23 @@ with col_side:
                 st.rerun()
             except:
                 st.error("Error al procesar JSON")
+
+    if st.button("💰 Ejecutar Compra Automática", use_container_width=True):
+        with st.spinner("Ejecutando compra..."):
+            try:
+                result = ejecutar_mision_compra()
+                st.success("Compra ejecutada. Revisa Telegram.")
+                st.json(result)
+            except Exception as e:
+                st.error(f"Error: {e}")
+
+    if st.button("📉 Ejecutar Monitoreo y Venta", use_container_width=True):
+        with st.spinner("Ejecutando monitoreo..."):
+            try:
+                monitorear_y_vender()
+                st.success("Monitoreo ejecutado.")
+            except Exception as e:
+                st.error(f"Error: {e}")
 
 with col_main:
     tabs = st.tabs(["📊 Monitor", "💼 Cartera", "🧠 Inteligencia", "📜 Historial"])
