@@ -334,6 +334,32 @@ def monitor():
     monitorear_y_vender()
     return jsonify({"status": "Monitored"})
 
+@app.route('/', methods=['GET'])
+def index():
+    return '''
+    <html>
+    <head><title>Argo Trading Control</title></head>
+    <body>
+    <h1>Argo Hedge Fund - Control de Agentes</h1>
+    <button onclick="executeTrade()">Ejecutar Análisis y Compra</button>
+    <button onclick="executeMonitor()">Ejecutar Monitoreo y Venta</button>
+    <div id="result"></div>
+    <script>
+    function executeTrade() {
+        fetch('/trade', { method: 'POST' })
+        .then(response => response.json())
+        .then(data => document.getElementById('result').innerText = JSON.stringify(data));
+    }
+    function executeMonitor() {
+        fetch('/monitor', { method: 'POST' })
+        .then(response => response.json())
+        .then(data => document.getElementById('result').innerText = JSON.stringify(data));
+    }
+    </script>
+    </body>
+    </html>
+    '''
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)</content>
 <parameter name="filePath">C:\Users\Salvador\Argo-v3.0\app.py
