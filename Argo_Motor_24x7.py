@@ -4,6 +4,7 @@ import json
 import pandas as pd
 import requests
 import pytz
+import random
 from datetime import datetime
 from dotenv import load_dotenv
 from crewai import Agent, Task, Crew, Process
@@ -114,7 +115,7 @@ def obtener_datos_polymarket():
                         "volatilidad": change,
                     }
                 )
-        except Exception as e:
+    except Exception as e:
         print(f"Error en API: {e}")
 
 
@@ -140,7 +141,7 @@ def ejecutar_mision_compra():
         {"model": "gemini/gemini-2.5-flash", "tools": False},
         {"model": "gemini/gemini-2.5-pro", "tools": False},
         {"model": "ollama/llama3.1", "tools": False},
-        {"model": "ollama/gemma2:9b", "tools": False}
+        {"model": "ollama/gemma2:9b", "tools": False},
     ]
     exito_kickoff = False
     resultado_kickoff = None

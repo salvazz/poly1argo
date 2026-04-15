@@ -23,8 +23,10 @@ SPAIN_TZ = pytz.timezone("Europe/Madrid")
 
 app = Flask(__name__)
 
+
 def obtener_hora_espana():
     return datetime.now(SPAIN_TZ)
+
 
 def cargar_aprendizaje():
     if os.path.exists(LEARNING_FILE):
@@ -32,9 +34,11 @@ def cargar_aprendizaje():
             return json.load(f)
     return {"models": {}, "patterns": {}}
 
+
 def guardar_aprendizaje(data):
     with open(LEARNING_FILE, "w") as f:
         json.dump(data, f, indent=4)
+
 
 def actualizar_aprendizaje(modelo, exito, razon_error=None):
     data = cargar_aprendizaje()
@@ -49,6 +53,7 @@ def actualizar_aprendizaje(modelo, exito, razon_error=None):
             data["models"][modelo]["errores"].get(error_key, 0) + 1
         )
     guardar_aprendizaje(data)
+
 
 def seleccionar_modelo_inteligente(backends):
     data = cargar_aprendizaje()
@@ -70,6 +75,7 @@ def seleccionar_modelo_inteligente(backends):
         mejor = random.choice(list(scores.keys()))
     return next(b for b in backends if b["model"] == mejor)
 
+
 def enviar_telegram(mensaje):
     token = os.environ.get("TELEGRAM_TOKEN")
     chat_id = os.environ.get("CHAT_ID")
@@ -82,6 +88,7 @@ def enviar_telegram(mensaje):
             )
         except Exception as e:
             print(f"Error enviando telegram: {e}")
+
 
 def obtener_datos_polymarket():
     mercados = []
@@ -110,51 +117,63 @@ def obtener_datos_polymarket():
         print(f"Error en API: {e}")
     return mercados
 
+
 def monitorear_y_vender():
     """Vigilancia con TRAILING STOP LOSS."""
-    if not os.path.exists(HISTORIAL_CSV): return
+    if not os.path.exists(HISTORIAL_CSV):
+        return
     df = pd.read_csv(HISTORIAL_CSV)
-    if 'estado' not in df.columns: df['estado'] = 'ABIERTA'
-    if 'max_precio' not in df.columns: df['max_precio'] = df['Precio']
-    
-    abiertas = df[df['estado'] == 'ABIERTA']
-    if abiertas.empty: return
+    if "estado" not in df.columns:
+        df["estado"] = "ABIERTA"
+    if "max_precio" not in df.columns:
+        df["max_precio"] = df["Precio"]
+
+    abiertas = df[df["estado"] == "ABIERTA"]
+    if abiertas.empty:
+        return
 
     mercados_actuales = obtener_datos_polymarket()
-    precios_map = {m['titulo']: m['precio'] for m in mercados_actuales}
+    precios_map = {m["titulo"]: m["precio"] for m in mercados_actuales}
 
     for idx, row in abiertas.iterrows():
-        mercado = row['Mercado']
+        mercado = row["Mercado"]
         if mercado in precios_map:
             p_actual = precios_map[mercado]
-            tp = row['TP']
-            sl = row['SL']
-            max_p = row['max_precio']
-            
+            tp = row["TP"]
+            sl = row["SL"]
+            max_p = row["max_precio"]
+
             if p_actual > max_p:
-                df.at[idx, 'max_precio'] = p_actual
+                df.at[idx, "max_precio"] = p_actual
                 nuevo_sl = max(sl, p_actual * 0.85)
-                df.at[idx, 'SL'] = nuevo_sl
+                df.at[idx, "SL"] = nuevo_sl
                 print(f"Subiendo Trailing SL para {mercado} a {nuevo_sl:.2f}")
 
             if p_actual >= tp:
-                df.at[idx, 'estado'] = 'CERRADA'
-                df.at[idx, 'precio_cierre'] = p_actual
-                enviar_telegram(f"💰 *TP ALCANZADO (+profit)*\n{mercado}\nCierre: {p_actual}")
-            elif p_actual <= df.at[idx, 'SL']:
-                df.at[idx, 'estado'] = 'CERRADA'
-                df.at[idx, 'precio_cierre'] = p_actual
-                enviar_telegram(f"🛡️ *TRAILING SL DISPARADO*\n{mercado}\nCierre: {p_actual}")
-            
+                df.at[idx, "estado"] = "CERRADA"
+                df.at[idx, "precio_cierre"] = p_actual
+                enviar_telegram(
+                    f"💰 *TP ALCANZADO (+profit)*\n{mercado}\nCierre: {p_actual}"
+                )
+            elif p_actual <= df.at[idx, "SL"]:
+                df.at[idx, "estado"] = "CERRADA"
+                df.at[idx, "precio_cierre"] = p_actual
+                enviar_telegram(
+                    f"🛡️ *TRAILING SL DISPARADO*\n{mercado}\nCierre: {p_actual}"
+                )
+
     df.to_csv(HISTORIAL_CSV, index=False)
+
 
 def registrar_log_audit(accion, mercado, p_final, razon):
     # Assuming a log function, implement if needed
     pass
 
+
 def consultar_gemini_brain(mercado, p_mercado):
     # Stub, implement if needed
     return {"confianza": 0.7}
+
 
 def ejecutar_mision_compra():
     api_key = os.environ.get("GROQ_API_KEY")
@@ -178,7 +197,7 @@ def ejecutar_mision_compra():
         {"model": "gemini/gemini-2.5-flash", "tools": False},
         {"model": "gemini/gemini-2.5-pro", "tools": False},
         {"model": "ollama/llama3.1", "tools": False},
-        {"model": "ollama/gemma2:9b", "tools": False}
+        {"model": "ollama/gemma2:9b", "tools": False},
     ]
     exito_kickoff = False
     resultado_kickoff = None
@@ -187,9 +206,7 @@ def ejecutar_mision_compra():
     backend_cfg = seleccionar_modelo_inteligente(backends)
     modelo_usado = backend_cfg["model"]
 
-    backends_to_try = [backend_cfg] + [
-        b for b in backends if b != backend_cfg
-    ]
+    backends_to_try = [backend_cfg] + [b for b in backends if b != backend_cfg]
 
     for backend_cfg in backends_to_try:
         b_modelo = backend_cfg["model"]
@@ -324,19 +341,22 @@ def ejecutar_mision_compra():
             actualizar_aprendizaje(modelo_usado, False, "parse_error")
         return {"error": str(e)}
 
-@app.route('/trade', methods=['POST'])
+
+@app.route("/trade", methods=["POST"])
 def trade():
     result = ejecutar_mision_compra()
     return jsonify(result)
 
-@app.route('/monitor', methods=['POST'])
+
+@app.route("/monitor", methods=["POST"])
 def monitor():
     monitorear_y_vender()
     return jsonify({"status": "Monitored"})
 
-@app.route('/', methods=['GET'])
+
+@app.route("/", methods=["GET"])
 def index():
-    return '''
+    return """
     <html>
     <head><title>Argo Trading Control</title></head>
     <body>
@@ -358,8 +378,8 @@ def index():
     </script>
     </body>
     </html>
-    '''
+    """
 
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)</content>
-<parameter name="filePath">C:\Users\Salvador\Argo-v3.0\app.py
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5000)
