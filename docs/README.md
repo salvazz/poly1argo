@@ -66,18 +66,15 @@ Imagina que el servidor es una casa mágica en la nube. Los agentes son robots q
 
 Los robots despiertan, analizan Polymarket con IA, deciden compras/ventas si hay ventaja, actualizan el historial CSV, y envían notificaciones por Telegram.
 
-### Para que funcione automáticamente:
-1. Accede a la instancia (usa Cloud Shell o consola OCI para ejecutar comandos).
-2. Instala cron si no está: `sudo apt install cron`
-3. Edita el crontab: `crontab -e`
-4. Agrega estas líneas para ejecutar cada 20 minutos análisis y cada 10 minutos monitoreo:
-   ```
-   */20 * * * * curl -X POST http://localhost:5000/trade
-   */10 * * * * curl -X POST http://localhost:5000/monitor
-   ```
-5. Guarda y sal (Ctrl+X, Y, Enter).
+### Para que funcione automáticamente (método experto):
+Ejecuta el script `setup.sh` en la instancia para automatizar todo:
 
-Ahora, los agentes ejecutarán automáticamente sin intervención. Revisa logs para confirmar.
+1. Sube `setup.sh` a la instancia (usa scp o Cloud Shell upload).
+2. En la consola de la instancia: `chmod +x setup.sh && ./setup.sh`
+3. El script instala Ollama, modelos, dependencias, configura cron, y inicia la app.
+4. Configura `.env` manualmente después con tus claves API.
+
+Ahora, los agentes ejecutan automáticamente cada 20/10 minutos. Revisa logs para confirmar.
 
 ### Notas:
 - La app Flask corre en la instancia en puerto 5000.
