@@ -55,10 +55,12 @@ Imagina que el servidor es una casa mágica en la nube. Los agentes son robots q
 2. Busca la puerta (la instancia corriendo en 158.179.208.247).
 
 3. Para ejecutar análisis y compra:
+   - Desde el dashboard: Ejecuta `streamlit run Argo_Dashboard_Autonomo.py` y haz clic en "💰 Ejecutar Compra Automática".
    - Desde móvil o PC, abre en navegador: `http://158.179.208.247:5000` y haz clic en "Ejecutar Análisis y Compra".
    - O en terminal: `curl -X POST http://158.179.208.247:5000/trade`
 
 4. Para monitorear y vender:
+   - Desde el dashboard: Haz clic en "📉 Ejecutar Monitoreo y Venta".
    - Abre `http://158.179.208.247:5000` y haz clic en "Ejecutar Monitoreo y Venta".
    - O terminal: `curl -X POST http://158.179.208.247:5000/monitor`
 
