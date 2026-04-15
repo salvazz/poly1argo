@@ -1,0 +1,13 @@
+streamlit
+pandas
+requests
+python-dotenv
+pytz
+crewai
+crewai-tools
+google-genai
+litellm
+plotly
+psutil
+langchain-community
+langchain-groq

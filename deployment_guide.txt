@@ -1,0 +1,71 @@
+# Pasos para desplegar la API de trading en OCI
+
+## 1. Acceso SSH a la instancia
+Si no tienes acceso SSH:
+- Ve a la consola OCI > Instancias > Tu instancia
+- En Recursos > VNIC > VNIC principal > Lista de seguridad
+- Agrega regla de ingreso: Tipo TCP, Puerto 22, Fuente 0.0.0.0/0
+- Genera claves SSH si es necesario: ssh-keygen
+- Sube la clave pública: oci compute instance update --instance-id <id> --ssh-authorized-keys-file ~/.ssh/id_rsa.pub
+- Conecta: ssh -i ~/.ssh/id_rsa ubuntu@158.179.208.247 (asumiendo Ubuntu)
+
+## 2. Preparar el código
+# En tu máquina local, comprime el código:
+zip -r argo.zip .
+
+# Sube a la instancia:
+scp argo.zip ubuntu@158.179.208.247:~
+
+# En la instancia:
+unzip argo.zip
+cd Argo-v3.0
+
+## 3. Instalar dependencias
+sudo apt update
+sudo apt install python3 python3-pip
+pip3 install -r requirements.txt
+
+## 4. Configurar variables de entorno
+# Crea o edita .env con tus claves API:
+# GROQ_API_KEY=tu_clave
+# TAVILY_API_KEY=tu_clave
+# GEMINI_API_KEY=tu_clave
+# TELEGRAM_TOKEN=tu_token
+# CHAT_ID=tu_chat_id
+
+# Crea directorio data:
+mkdir -p data
+
+## 5. Ejecutar la aplicación
+# Para desarrollo:
+python3 app.py &
+
+# Para producción (mejor):
+pip3 install gunicorn
+gunicorn -w 4 -b 0.0.0.0:5000 app:app &
+
+# Verifica que corre: curl http://localhost:5000/trade (POST)
+
+## 6. Abrir puerto en OCI
+# En consola OCI > Redes > Lista de seguridad de tu VCN
+# Agrega regla de ingreso: TCP, Puerto 5000, Fuente 0.0.0.0/0
+
+## 7. Configurar API Gateway
+# En consola OCI > Desarrollador > API Gateway
+- Crea Gateway: Nombre 'ArgoGateway', Compartment, VCN público, Subnet público
+- Crea Deployment: 
+  - Ruta: /trade
+  - Método: POST
+  - Backend: HTTP
+  - URL: http://158.179.208.247:5000/trade
+- Despliega
+
+# La URL del API Gateway será algo como https://xxxxx.apigateway.us-ashburn-1.oci.customer-oci.com/trade
+
+# Prueba: curl -X POST https://tu-url-gateway/trade
+
+## Endpoint disponible:
+- POST /trade: Ejecuta la lógica de compra
+- POST /monitor: Ejecuta monitoreo de ventas
+
+Completo.

@@ -1,0 +1,8 @@
+schema_version: 20180708
+name: argo-trading-function
+version: '0.0.1'
+runtime: python
+build_image: fnproject/python:3.9
+entrypoint: /python/bin/fn -c "from func import handler; handler(None, None)"
+memory: 256
+timeout: 120
