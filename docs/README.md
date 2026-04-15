@@ -55,14 +55,12 @@ Imagina que el servidor es una casa mágica en la nube. Los agentes son robots q
 2. Busca la puerta (la instancia corriendo en 158.179.208.247).
 
 3. Para ejecutar análisis y compra:
-   - En Cloud Shell o terminal, escribe:
-     ```
-     curl -X POST http://158.179.208.247:5000/trade
-     ```
-   - O abre en navegador: `http://158.179.208.247:5000/trade` (haz POST request).
+   - Desde móvil o PC, abre en navegador: `http://158.179.208.247:5000` y haz clic en "Ejecutar Análisis y Compra".
+   - O en terminal: `curl -X POST http://158.179.208.247:5000/trade`
 
 4. Para monitorear y vender:
-   - Cambia "trade" por "monitor": `curl -X POST http://158.179.208.247:5000/monitor`
+   - Abre `http://158.179.208.247:5000` y haz clic en "Ejecutar Monitoreo y Venta".
+   - O terminal: `curl -X POST http://158.179.208.247:5000/monitor`
 
 Los robots despiertan, analizan Polymarket con IA, deciden compras/ventas si hay ventaja, actualizan el historial CSV, y envían notificaciones por Telegram.
 
