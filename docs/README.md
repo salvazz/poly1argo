@@ -66,15 +66,66 @@ Imagina que el servidor es una casa mágica en la nube. Los agentes son robots q
 
 Los robots despiertan, analizan Polymarket con IA, deciden compras/ventas si hay ventaja, actualizan el historial CSV, y envían notificaciones por Telegram.
 
-### Para que funcione automáticamente (método experto):
-Ejecuta el script `setup.sh` en la instancia para automatizar todo:
+### Despliegue Profesional en OCI (Configuración Completa)
 
-1. Sube `setup.sh` a la instancia (usa scp o Cloud Shell upload).
-2. En la consola de la instancia: `chmod +x setup.sh && ./setup.sh`
-3. El script instala Ollama, modelos, dependencias, configura cron, y inicia la app.
-4. Configura `.env` manualmente después con tus claves API.
+#### Preparación de la Instancia
+1. **Crear/Acceder Instancia**: Usa instancia Ubuntu en OCI (ej: VM.Standard.E5.Flex).
+2. **Actualizar Sistema**:
+   ```bash
+   sudo apt update && sudo apt upgrade -y
+   ```
+3. **Instalar Dependencias Base**:
+   ```bash
+   sudo apt install python3 python3-pip git curl -y
+   ```
 
-Ahora, los agentes ejecutan automáticamente cada 20/10 minutos. Revisa logs para confirmar.
+#### Instalación Automática con Script
+1. **Descargar Script**:
+   ```bash
+   wget https://raw.githubusercontent.com/salvazz/poly1argo/main/setup.sh
+   chmod +x setup.sh
+   ```
+2. **Ejecutar Setup Completo**:
+   ```bash
+   ./setup.sh
+   ```
+   - Instala Ollama y modelos IA (llama3.1, gemma2:9b).
+   - Clona el repositorio.
+   - Instala dependencias Python.
+   - Configura cron para ejecución automática.
+   - Inicia la aplicación web.
+
+#### Configuración Manual de Claves API
+Después del setup, configura `.env`:
+```bash
+nano poly1argo/.env
+```
+Agrega:
+```
+TELEGRAM_TOKEN=tu_token
+CHAT_ID=tu_chat_id
+GROQ_API_KEY=tu_groq_key
+GEMINI_API_KEY=tu_gemini_key
+TAVILY_API_KEY=tu_tavily_key
+```
+
+#### Verificación de Procesos
+- **Ollama**: `ollama list` (debe mostrar modelos).
+- **App Web**: `curl http://localhost:5000` (debe responder).
+- **Cron**: `crontab -l` (debe tener líneas para --trade y --monitor).
+- **Logs**: `tail -f nohup.out` (para ver ejecución).
+
+#### Acceso Externo
+- **Interfaz Web**: http://[IP_INSTANCIA]:5000
+- **API Directa**: curl -X POST http://[IP_INSTANCIA]:5000/trade
+- **Telegram**: Recibe notificaciones automáticas.
+
+#### Monitoreo y Mantenimiento
+- Reinicia app: `pkill gunicorn && cd poly1argo && gunicorn -w 4 -b 0.0.0.0:5000 app:app &`
+- Actualizar: `cd poly1argo && git pull && pip3 install -r requirements.txt`
+- Backup data: Copia `poly1argo/data/` regularmente.
+
+El sistema ahora opera 24/7 con IA local, sin dependencias externas fallidas.
 
 ### Notas:
 - La app Flask corre en la instancia en puerto 5000.
