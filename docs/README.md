@@ -42,5 +42,26 @@ Sistema de trading predictivo de alto rendimiento para **Polymarket** utilizando
 *   `oracle.key` está en el `.gitignore` y no debe ser compartido.
 *   Las claves API se gestionan exclusivamente vía `.env`.
 
+## 🌐 Despliegue en Oracle Cloud (Servidor)
+
+El proyecto está subido a Oracle Cloud. Para ejecutar los agentes desde el servidor:
+
+Imagina que el servidor es una casa mágica. Los agentes son robots que viven ahí.
+
+1. Ve a la casa (abre https://cloud.oracle.com).
+
+2. Busca la puerta secreta (API Gateway > Deployments > copia la URL como https://casa-magica.com).
+
+3. Toca el timbre para comprar: En Cloud Shell, escribe:
+   ```
+   curl -X POST https://casa-magica.com/argo/trade
+   ```
+
+4. Toca el timbre para vender: Cambia "trade" por "monitor".
+
+Los robots despiertan, miran mercados, compran o venden, y avisan por Telegram.
+
+Si no funciona, revisa logs: `ssh ubuntu@158.179.208.247 tail -f nohup.out`.
+
 ---
 *Este proyecto tiene fines educativos y de investigación cuantitativa.*
