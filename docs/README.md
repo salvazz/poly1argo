@@ -46,22 +46,31 @@ Sistema de trading predictivo de alto rendimiento para **Polymarket** utilizando
 
 El proyecto está subido a Oracle Cloud. Para ejecutar los agentes desde el servidor:
 
-Imagina que el servidor es una casa mágica. Los agentes son robots que viven ahí.
+Imagina que el servidor es una casa mágica en la nube. Los agentes son robots que viven ahí.
 
-1. Ve a la casa (abre https://cloud.oracle.com).
+### Instrucciones de Uso:
 
-2. Busca la puerta secreta (API Gateway > Deployments > copia la URL como https://casa-magica.com).
+1. Ve a la casa (abre https://cloud.oracle.com y entra a tu tenancy).
 
-3. Toca el timbre para comprar: En Cloud Shell, escribe:
-   ```
-   curl -X POST https://casa-magica.com/argo/trade
-   ```
+2. Busca la puerta (la instancia corriendo en 158.179.208.247).
 
-4. Toca el timbre para vender: Cambia "trade" por "monitor".
+3. Para ejecutar análisis y compra:
+   - En Cloud Shell o terminal, escribe:
+     ```
+     curl -X POST http://158.179.208.247:5000/trade
+     ```
+   - O abre en navegador: `http://158.179.208.247:5000/trade` (haz POST request).
 
-Los robots despiertan, miran mercados, compran o venden, y avisan por Telegram.
+4. Para monitorear y vender:
+   - Cambia "trade" por "monitor": `curl -X POST http://158.179.208.247:5000/monitor`
 
-Si no funciona, revisa logs: `ssh ubuntu@158.179.208.247 tail -f nohup.out`.
+Los robots despiertan, analizan Polymarket con IA, deciden compras/ventas si hay ventaja, actualizan el historial CSV, y envían notificaciones por Telegram.
+
+### Notas:
+- La app Flask corre en la instancia en puerto 5000.
+- Si usas API Gateway, configura un deployment con backend HTTP a http://158.179.208.247:5000/trade
+- Revisa logs en la instancia: `tail -f nohup.out`
+- Asegura que el puerto 5000 esté abierto en la Security List de la VCN.
 
 ---
 *Este proyecto tiene fines educativos y de investigación cuantitativa.*
