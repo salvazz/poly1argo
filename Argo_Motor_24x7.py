@@ -138,8 +138,9 @@ def ejecutar_mision_compra():
 
     # BUG 4: Priorizar modelos cloud (Gemini) sobre locales
     backends = [
-        {"model": "gemini/gemini-2.5-flash", "tools": False},
-        {"model": "gemini/gemini-2.5-pro", "tools": False},
+        {"model": "groq/llama3-70b-8192", "tools": False},
+        {"model": "gemini/gemini-1.5-flash", "tools": False},
+        {"model": "gemini/gemini-1.5-pro", "tools": False},
         {"model": "ollama/llama3.1", "tools": False},
         {"model": "ollama/gemma2:9b", "tools": False},
     ]
